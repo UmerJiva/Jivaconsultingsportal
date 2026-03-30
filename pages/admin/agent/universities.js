@@ -1,8 +1,8 @@
 // pages/agent/universities.js  (Programs search page — same for agent & student)
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import AdminLayout from '../../components/layout/AdminLayout';
-import { Spinner } from '../../components/ui/index';
+import AdminLayout from '../../../components/layout/AdminLayout';
+import { Spinner } from '../../../components/ui/index';
 import { Search, Filter, Heart, ExternalLink, ChevronLeft, ChevronRight, CheckCircle, Zap, X } from 'lucide-react';
 
 const TAG_COLORS = {
