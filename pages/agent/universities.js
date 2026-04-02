@@ -503,10 +503,12 @@ export default function ProgramsSearch() {
       </div>
 
       {/* Application Wizard */}
-      {applyProg && (
-        <ApplicationWizard program={applyProg} onClose={() => setApplyProg(null)}
-          onSuccess={() => { setApplyProg(null); router.push('/agent/applications'); }}/>
-      )}
+      <ApplicationWizard
+        open={!!applyProg}
+        program={applyProg}
+        userRole="agent"
+        onClose={() => setApplyProg(null)}
+      />
     </AdminLayout>
   );
 }

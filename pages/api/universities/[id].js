@@ -124,7 +124,9 @@ async function handler(req, res) {
                   campus_city=?, location_text=?, duration_text=?,
                   available_intakes=?, tags=?, success_chance=?,
                   instant_submission=?, instant_offer=?,
-                  commission_text=?, commission_type=?, commission_amount=?, commission_percent=?, is_active=1
+                  commission_text=?, commission_type=?, commission_amount=?, commission_percent=?,
+                  commission_currency=?, start_date=?, application_deadline=?,
+                  is_active=1
                 WHERE id=? AND university_id=?
               `, [
                 p.name, p.level||'Bachelor', p.tuition_fee||null, p.currency||'USD',
@@ -132,7 +134,9 @@ async function handler(req, res) {
                 p.campus_city||null, p.location_text||null, p.duration_text||null,
                 p.available_intakes||null, p.tags||null,
                 p.success_chance||'High', p.instant_submission?1:0, p.instant_offer?1:0,
-                p.commission_text||null, p.commission_type||'text', p.commission_amount||null, p.commission_percent||null, p.id, id
+                p.commission_text||null, p.commission_type||'text', p.commission_amount||null, p.commission_percent||null,
+                p.commission_currency||'USD', p.start_date||null, p.application_deadline||null,
+                p.id, id
               ]);
             } else {
               // Insert new
@@ -142,8 +146,9 @@ async function handler(req, res) {
                  application_fee, app_fee_currency, campus_city, location_text,
                  duration_text, available_intakes, tags, success_chance,
                  instant_submission, instant_offer, commission_text,
-                 commission_type, commission_amount, commission_percent, is_active)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)
+                 commission_type, commission_amount, commission_percent,
+                 commission_currency, start_date, application_deadline, is_active)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)
               `, [
                 id, p.name, p.level||'Bachelor', p.tuition_fee||null, p.currency||'USD',
                 p.application_fee||0, p.app_fee_currency||'USD',
@@ -151,7 +156,8 @@ async function handler(req, res) {
                 p.available_intakes||null, p.tags||null,
                 p.success_chance||'High', p.instant_submission?1:0, p.instant_offer?1:0,
                 p.commission_text||null, p.commission_type||'text',
-                p.commission_amount||null, p.commission_percent||null
+                p.commission_amount||null, p.commission_percent||null,
+                p.commission_currency||'USD', p.start_date||null, p.application_deadline||null
               ]);
             }
           }

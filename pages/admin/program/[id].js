@@ -90,6 +90,9 @@ function EditModal({ open, prog, onClose, onSaved }) {
         instant_submission: prog.instant_submission?true:false,
         instant_offer: prog.instant_offer?true:false,
         commission_text: prog.commission_text||'',
+        start_date: prog.start_date?.split('T')[0]||'',
+        application_deadline: prog.application_deadline?.split('T')[0]||'',
+        commission_currency: prog.commission_currency||'USD',
         description: prog.description||'',
         min_gpa: prog.min_gpa||'', min_ielts: prog.min_ielts||'',
         min_toefl: prog.min_toefl||'', min_pte: prog.min_pte||'',
@@ -148,6 +151,14 @@ function EditModal({ open, prog, onClose, onSaved }) {
             <FL label="Location Text"><input className={inp} value={form.location_text||''} onChange={e=>f('location_text',e.target.value)} placeholder="Greater London, UK"/></FL>
           </div>
           <FL label="Available Intakes" hint="Comma-separated: Sep 2026,Jan 2027"><input className={inp} value={form.available_intakes||''} onChange={e=>f('available_intakes',e.target.value)} placeholder="Sep 2026,Jan 2027"/></FL>
+          <div className="grid grid-cols-2 gap-4">
+            <FL label="Program Start Date" hint="Earliest or next start date">
+              <input type="date" className={inp} value={form.start_date||''} onChange={e=>f('start_date',e.target.value)}/>
+            </FL>
+            <FL label="Application Deadline" hint="Last date to apply">
+              <input type="date" className={inp} value={form.application_deadline||''} onChange={e=>f('application_deadline',e.target.value)}/>
+            </FL>
+          </div>
           <FL label="Commission"><input className={inp} value={form.commission_text||''} onChange={e=>f('commission_text',e.target.value)} placeholder="Up to £2,800"/></FL>
           <div className="grid grid-cols-3 gap-4">
             <FL label="Instant Submission"><select className={sel} value={form.instant_submission?'1':'0'} onChange={e=>f('instant_submission',e.target.value==='1')}><option value="1">Yes</option><option value="0">No</option></select></FL>
@@ -450,7 +461,15 @@ export default function AdminProgramDetail() {
 
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
                 <div className="divide-y divide-slate-100">
-                  {[[GraduationCap,prog.level?`${prog.level}'s Degree`:prog.level,'Program Level'],[Calendar,prog.duration_text||'—','Program Length'],[Home,prog.cost_of_living||'—','Cost of Living'],[DollarSign,fee,'Gross Tuition'],[DollarSign,appFee,'Application Fee']].map(([Icon,v,label])=>(
+                  {[
+                    [GraduationCap, prog.level ? `${prog.level}'s Degree` : prog.level, 'Program Level'],
+                    [Calendar, prog.duration_text||'—', 'Program Duration'],
+                    [Home, prog.cost_of_living||'—', 'Cost of Living'],
+                    [DollarSign, fee, 'Gross Tuition'],
+                    [DollarSign, appFee, 'Application Fee'],
+                    ...(prog.start_date ? [[Calendar, new Date(prog.start_date).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}), 'Next Start Date']] : []),
+                    ...(prog.application_deadline ? [[Calendar, new Date(prog.application_deadline).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}), 'Application Deadline']] : []),
+                  ].map(([Icon,v,label])=>(
                     <div key={label} className="flex items-center gap-3 py-3.5 first:pt-0 last:pb-0">
                       <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center shrink-0"><Icon className="w-4 h-4 text-slate-500"/></div>
                       <div><div className="font-bold text-slate-800 text-sm">{v}</div><div className="text-xs text-slate-400">{label}</div></div>

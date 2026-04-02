@@ -88,10 +88,19 @@ async function handler(req, res) {
       if (!uniId) return res.status(400).json({ error: 'University not found' });
 
       const code = 'APP' + String(Date.now()).slice(-7);
-      const [result] = await query(
+      const { getPool } = await import('../../../lib/db');
+      const pool = getPool();
+      const [result] = await pool.execute(
         'INSERT INTO applications (student_id, program_id, university_id, agent_id, intake, notes, app_code, status) VALUES (?,?,?,?,?,?,?,?)',
         [student_id, program_id, uniId, role==='agent'?roleId:null, intake||null, notes||null, code, 'Submitted']
       );
+      // Also log the creation
+      try {
+        await pool.execute(
+          'INSERT INTO application_logs (application_id, action, description, performed_by, performed_by_name, role) VALUES (?,?,?,?,?,?)',
+          [result.insertId, 'Application Created', `Application ${code} created`, req.user.userId, req.user.name||'User', req.user.role]
+        );
+      } catch {}
       return res.status(201).json({ message: 'Application created', id: result.insertId, app_code: code });
     } catch(err) {
       console.error('[apps POST]', err.message);

@@ -6,9 +6,9 @@ import { Eye, EyeOff, GraduationCap, Lock, Mail, ArrowRight, AlertCircle } from 
 import { fetchUser } from '../lib/auth';
 
 const HINTS = [
-  { label: 'Admin',   email: 'admin@eduportal.com',   pass: 'Admin@123'   },
-  { label: 'Agent',   email: 'agent@eduportal.com',   pass: 'Agent@123'   },
-  { label: 'Student', email: 'student@eduportal.com', pass: 'Student@123' },
+  { label: 'Admin',          email: 'admin@eduportal.com',   pass: 'Admin@123'   },
+  { label: 'Agent',          email: 'agent@eduportal.com',   pass: 'Agent@123'   },
+  { label: 'Student',        email: 'student@eduportal.com', pass: 'Student@123' },
 ];
 
 const STATS = [
@@ -17,12 +17,14 @@ const STATS = [
   { value: '48',     label: 'Countries'    },
 ];
 
-// Self-contained — no import dependency that might be stale
+// Handles all 5 roles
 function dashboardFor(role) {
-  if (role === 'admin')   return '/admin/dashboard';
-  if (role === 'agent')   return '/agent/dashboard';
-  if (role === 'student') return '/student/dashboard';
-  if (role === 'custom')  return '/admin/dashboard';
+  if (role === 'admin')          return '/admin/dashboard';
+  if (role === 'agent')          return '/agent/dashboard';
+  if (role === 'student')        return '/student/dashboard';
+  if (role === 'custom')         return '/admin/dashboard';
+  if (role === 'admin_employee') return '/admin/dashboard';   // same pages as admin
+  if (role === 'agent_employee') return '/agent/dashboard';   // same pages as agent
   return '/admin/dashboard';
 }
 

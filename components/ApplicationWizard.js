@@ -306,6 +306,8 @@ export default function ApplicationWizard({ open, onClose, program, userRole, cu
   const router = useRouter();
   const [step, setStep]         = useState(0);
   const [students, setStudents] = useState([]);
+  const [programs, setPrograms] = useState([]);
+  const [selectedProgram, setSelectedProgram] = useState(null); // used when program prop is null
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [selectedStudent, setSelectedStudent]       = useState(null);
   const [eligibility, setEligibility]               = useState(null);
@@ -317,9 +319,10 @@ export default function ApplicationWizard({ open, onClose, program, userRole, cu
   const [done, setDone]                             = useState(null);
   const [error, setError]                           = useState('');
 
-  const intakes = program?.available_intakes ? program.available_intakes.split(',').filter(Boolean) : [];
+  const effectiveProgram = program || selectedProgram;
+  const intakes = effectiveProgram?.available_intakes ? effectiveProgram.available_intakes.split(',').filter(Boolean) : [];
 
-  const prerequisites = program?.prerequisites
+  const prerequisites = effectiveProgram?.prerequisites
     ? (Array.isArray(program.prerequisites) ? program.prerequisites : (() => { try { return JSON.parse(program.prerequisites); } catch { return []; } })())
     : [
         { title:'Country Specific GPA - Pakistan', body:'For applicants educated in Pakistan, this program requires: Bachelor\'s degree from Pakistan studied over 4-5 years or Bachelor of Law with minimum Grade Point Average (GPA) 55% from a recognized academic institute.' },
@@ -329,7 +332,7 @@ export default function ApplicationWizard({ open, onClose, program, userRole, cu
         { title:'Credibility Interview', body:'Some applicants may be required to attend a credibility interview before a decision is made on their application.' },
       ];
 
-  const requiredDocs = program?.required_documents
+  const requiredDocs = effectiveProgram?.required_documents
     ? (Array.isArray(program.required_documents) ? program.required_documents : (() => { try { return JSON.parse(program.required_documents); } catch { return []; } })())
     : [
         { name:'Copy of Education Transcripts', type:'Document' },
@@ -360,7 +363,7 @@ export default function ApplicationWizard({ open, onClose, program, userRole, cu
     if (open) {
       setStep(0); setSelectedStudentId(null); setSelectedStudent(null);
       setEligibility(null); setSelectedIntake(''); setBackupPrograms([]);
-      setDone(null); setError('');
+      setDone(null); setError(''); setSelectedProgram(null);
       // If student role — auto-select self
       if (preselectedStudentId) { setSelectedStudentId(preselectedStudentId); setSelectedStudent(preselectedStudent); } else if (userRole === 'student' && currentUserId) {
         setSelectedStudentId(currentUserId);
@@ -380,22 +383,36 @@ export default function ApplicationWizard({ open, onClose, program, userRole, cu
     }).catch(() => {});
   }, [open, userRole]);
 
+  // Load programs list when no program pre-selected (opened from student detail)
+  useEffect(() => {
+    if (!open || program) return;
+    fetch('/api/programs?limit=200').then(r=>r.json()).then(d => {
+      setPrograms((d.programs||[]).map(p => ({
+        id: p.id, name: p.name, university_name: p.university_name||'',
+        university_id: p.university_id, level: p.level||'',
+        available_intakes: p.available_intakes||'',
+        prerequisites: p.prerequisites, required_documents: p.required_documents,
+      })));
+    }).catch(() => {});
+  }, [open, program]);
+
   // Check eligibility when student changes
   useEffect(() => {
-    if (!selectedStudentId || !program?.id) { setEligibility(null); return; }
+    const progId = program?.id || selectedProgram?.id;
+    if (!selectedStudentId || !progId) { setEligibility(null); return; }
     setCheckingElig(true); setEligibility(null);
-    fetch(`/api/applications/check-eligibility?program_id=${program.id}&student_id=${selectedStudentId}`)
+    fetch(`/api/applications/check-eligibility?program_id=${progId}&student_id=${selectedStudentId}`)
       .then(r=>r.json()).then(d => { setEligibility(d); setCheckingElig(false); })
       .catch(() => { setCheckingElig(false); });
-  }, [selectedStudentId, program?.id]);
+  }, [selectedStudentId, program?.id, selectedProgram?.id]);
 
   async function handleSubmit() {
     setSubmitting(true); setError('');
     try {
       const result = await apiCall('/api/applications', 'POST', {
         student_id: selectedStudentId,
-        program_id: program.id,
-        university_id: program.university_id,
+        program_id: effectiveProgram?.id,
+        university_id: effectiveProgram?.university_id,
         intake: selectedIntake || intakes[0] || null,
         backup_programs: backupPrograms,
       });
@@ -407,6 +424,7 @@ export default function ApplicationWizard({ open, onClose, program, userRole, cu
 
   function canProceed() {
     if (step === 0) {
+      if (!effectiveProgram) return false; // must select a program first
       if (!selectedStudentId) return false;
       if (!eligibility) return false;
       if (eligibility.status === 'not_eligible') return false;
@@ -460,26 +478,82 @@ export default function ApplicationWizard({ open, onClose, program, userRole, cu
 
           {/* Summary card (visible from step 1 onward) */}
           {step > 0 && (
-            <SummaryCard program={program} student={selectedStudent} intake={hasIntakesStep && step > 1 ? selectedIntake : (intakes[0]||null)}/>
+            <SummaryCard program={effectiveProgram} student={selectedStudent} intake={hasIntakesStep && step > 1 ? selectedIntake : (intakes[0]||null)}/>
           )}
 
           {/* ── STEP 0: ELIGIBILITY ── */}
           {step === 0 && (
             <div>
-              {/* Program info card */}
+              {/* Program selector — shown when no program pre-selected */}
+              {!program && (
+                <div className="mb-5">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Select Program <span className="text-red-500">*</span></label>
+                  {selectedProgram ? (
+                    <div className="flex items-center justify-between bg-brand-50 border-2 border-brand-300 rounded-xl px-4 py-3">
+                      <div>
+                        <div className="font-bold text-slate-800 text-sm">{selectedProgram.name}</div>
+                        <div className="text-xs text-slate-500">{selectedProgram.university_name} · {selectedProgram.level}</div>
+                      </div>
+                      <button onClick={()=>{ setSelectedProgram(null); setEligibility(null); }} className="text-xs text-red-500 font-bold hover:underline ml-3">Change</button>
+                    </div>
+                  ) : (
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="Search program by name or school…"
+                        className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:outline-none focus:border-brand-400 bg-white placeholder-slate-300 mb-2"
+                        onChange={e => {
+                          const q = e.target.value.toLowerCase();
+                          const filtered = programs.filter(p =>
+                            p.name.toLowerCase().includes(q) || p.university_name.toLowerCase().includes(q)
+                          );
+                          e.target._filtered = filtered;
+                          e.target.nextSibling.innerHTML = filtered.slice(0,8).map(p =>
+                            `<button data-id="${p.id}" class="w-full text-left px-3 py-2.5 hover:bg-brand-50 text-sm border-b border-slate-100 last:border-0 transition-colors">
+                              <div class="font-semibold text-slate-800">${p.name}</div>
+                              <div class="text-xs text-slate-400">${p.university_name} · ${p.level||''}</div>
+                            </button>`
+                          ).join('');
+                          // bind clicks
+                          Array.from(e.target.nextSibling.querySelectorAll('button')).forEach(btn => {
+                            btn.addEventListener('click', () => {
+                              const prog = programs.find(p => p.id === parseInt(btn.dataset.id));
+                              if (prog) { setSelectedProgram(prog); }
+                            });
+                          });
+                        }}
+                      />
+                      <div className="border border-slate-200 rounded-xl overflow-hidden max-h-52 overflow-y-auto bg-white">
+                        {programs.slice(0,8).map(p => (
+                          <button key={p.id} onClick={()=>setSelectedProgram(p)}
+                            className="w-full text-left px-3 py-2.5 hover:bg-brand-50 text-sm border-b border-slate-100 last:border-0 transition-colors">
+                            <div className="font-semibold text-slate-800">{p.name}</div>
+                            <div className="text-xs text-slate-400">{p.university_name} · {p.level||''}</div>
+                          </button>
+                        ))}
+                        {programs.length === 0 && <div className="text-center py-6 text-slate-400 text-sm">Loading programs…</div>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Program info card — shown when program pre-selected */}
+              {program && (
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-5 text-sm space-y-1.5">
                 <div className="grid grid-cols-[80px_1fr]">
                   <span className="font-bold text-slate-700">Program</span>
-                  <span className="text-slate-700">{program?.name}</span>
+                  <span className="text-slate-700">{effectiveProgram?.name}</span>
                 </div>
                 <div className="grid grid-cols-[80px_1fr]">
                   <span className="font-bold text-slate-700">School</span>
-                  <span className="text-slate-700">{program?.university_name}</span>
+                  <span className="text-slate-700">{effectiveProgram?.university_name}</span>
                 </div>
               </div>
+              )}
 
               <p className="text-sm font-semibold text-slate-700 mb-2">
-                Please select a student to check their eligibility for this program:
+                {effectiveProgram ? 'Please select a student to check their eligibility for this program:' : 'Select a program above, then choose a student:'}
               </p>
 
               {userRole === 'student' ? (

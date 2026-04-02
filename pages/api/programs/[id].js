@@ -98,7 +98,9 @@ async function handler(req, res) {
         campus_city, location_text, duration_text, available_intakes, tags,
         success_chance, instant_submission, instant_offer, commission_text,
         description, min_gpa, min_ielts, min_toefl, min_pte,
-        min_education_level, post_study_work_visa, commission_breakdown
+        min_education_level, post_study_work_visa, commission_breakdown,
+        start_date, application_deadline, commission_currency,
+        commission_type, commission_amount, commission_percent
       } = req.body;
 
       await query(`
@@ -109,7 +111,9 @@ async function handler(req, res) {
           instant_submission=?, instant_offer=?, commission_text=?,
           description=?, min_gpa=?, min_ielts=?, min_toefl=?, min_pte=?,
           min_education_level=?, post_study_work_visa=?,
-          commission_breakdown=?, updated_at=NOW()
+          commission_breakdown=?, start_date=?, application_deadline=?,
+          commission_currency=?, commission_type=?, commission_amount=?, commission_percent=?,
+          updated_at=NOW()
         WHERE id=?
       `, [
         name, level, tuition_fee||null, currency||'USD',
@@ -119,7 +123,10 @@ async function handler(req, res) {
         instant_submission?1:0, instant_offer?1:0, commission_text||null,
         description||null, min_gpa||null, min_ielts||null,
         min_toefl||null, min_pte||null, min_education_level||null,
-        post_study_work_visa?1:0, commission_breakdown||null, id
+        post_study_work_visa?1:0, commission_breakdown||null,
+        start_date||null, application_deadline||null,
+        commission_currency||'USD', commission_type||'text',
+        commission_amount||null, commission_percent||null, id
       ]);
       return res.json({ message: 'Program updated' });
     }

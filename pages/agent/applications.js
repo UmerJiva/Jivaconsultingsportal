@@ -9,6 +9,7 @@ import {
   X, ChevronDown, Eye, FileText, CheckCircle, Clock, XCircle,
   Users, Calendar, MoreHorizontal, Award, TrendingUp, Inbox
 } from 'lucide-react';
+import usePermissions, { AccessDenied } from '../../lib/usePermissions';
 
 const STATUS_CFG = {
   'Submitted':        { bg:'bg-blue-50',    text:'text-blue-700',    border:'border-blue-200',    dot:'bg-blue-500'    },
@@ -72,6 +73,10 @@ const STATUSES = ['Submitted','Under Review','Accepted','Offer Received','Condit
 
 export default function AgentApplications() {
   const router = useRouter();
+
+  // ── PERMISSIONS ──────────────────────────────────────────────
+  const { can, isEmployee, loading: permLoading } = usePermissions();
+
   const [apps, setApps]           = useState([]);
   const [total, setTotal]         = useState(0);
   const [pages, setPages]         = useState(1);
@@ -95,19 +100,35 @@ export default function AgentApplications() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const p = new URLSearchParams({ page, limit:LIMIT });
-      if (search)       p.set('search', search);
-      if (statusFilter) p.set('status', statusFilter);
-      if (intakeFilter) p.set('intake', intakeFilter);
-      const data = await fetch(`/api/applications?${p}`).then(r=>r.json());
+      // agent_employee: fetch only their assigned students' applications
+      let url;
+      if (isEmployee) {
+        url = '/api/agent-employee/applications';
+      } else {
+        const p = new URLSearchParams({ page, limit:LIMIT });
+        if (search)       p.set('search', search);
+        if (statusFilter) p.set('status', statusFilter);
+        if (intakeFilter) p.set('intake', intakeFilter);
+        url = `/api/applications?${p}`;
+      }
+      const data = await fetch(url).then(r=>r.json());
       setApps(data.applications||[]);
-      setTotal(data.total||0);
+      setTotal(data.total||(data.applications||[]).length||0);
       setPages(data.pages||1);
       setSelected(new Set());
     } finally { setLoading(false); }
-  }, [page, search, statusFilter, intakeFilter]);
+  }, [page, search, statusFilter, intakeFilter, isEmployee]);
 
-  useEffect(()=>{ load(); },[load]);
+  useEffect(()=>{ if (!permLoading) load(); },[load, permLoading]);
+
+  // Block page if employee has no view_applications permission
+  if (!permLoading && isEmployee && !can('view_applications')) {
+    return (
+      <AdminLayout title="Applications">
+        <AccessDenied message="You don't have permission to view applications. Ask your agent to grant you access." />
+      </AdminLayout>
+    );
+  }
 
   function setCol(k,v) { setColFilters(f=>({...f,[k]:v})); }
 
@@ -145,7 +166,6 @@ export default function AgentApplications() {
     setSelected(s);
   }
 
-  // ── Navigate to application detail ──
   function viewApp(a) { router.push(`/agent/application/${a.id}`); }
   function viewStudent(a) { router.push(`/agent/student/${a.student_id}`); }
 
@@ -168,20 +188,28 @@ export default function AgentApplications() {
           <button onClick={load} className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 transition-colors">
             <RefreshCw className="w-4 h-4"/>
           </button>
-          <button onClick={()=>setShowFilters(f=>!f)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-bold transition-colors
-              ${showFilters?'bg-brand-600 border-brand-600 text-white':'bg-white border-slate-200 text-slate-700 hover:border-slate-300'}`}>
-            <Filter className="w-4 h-4"/>Column Filters
-            {Object.values(colFilters).some(Boolean)&&<span className="bg-white/30 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{Object.values(colFilters).filter(Boolean).length}</span>}
-          </button>
-          <button onClick={()=>router.push('/agent/applications/new')}
-            className="flex items-center gap-2 bg-brand-700 hover:bg-brand-800 text-white font-bold px-5 py-2.5 rounded-xl transition-colors shadow-sm text-sm">
-            <Plus className="w-4 h-4"/>New Application
-          </button>
+
+          {/* Column filters — hide for employees */}
+          {!isEmployee && (
+            <button onClick={()=>setShowFilters(f=>!f)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-bold transition-colors
+                ${showFilters?'bg-brand-600 border-brand-600 text-white':'bg-white border-slate-200 text-slate-700 hover:border-slate-300'}`}>
+              <Filter className="w-4 h-4"/>Column Filters
+              {Object.values(colFilters).some(Boolean)&&<span className="bg-white/30 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{Object.values(colFilters).filter(Boolean).length}</span>}
+            </button>
+          )}
+
+          {/* New Application — only if can_add_applications */}
+          {can('add_applications') && (
+            <button onClick={()=>router.push('/agent/applications/new')}
+              className="flex items-center gap-2 bg-brand-700 hover:bg-brand-800 text-white font-bold px-5 py-2.5 rounded-xl transition-colors shadow-sm text-sm">
+              <Plus className="w-4 h-4"/>New Application
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Stat boxes — clickable to filter */}
+      {/* Stat boxes */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
         <StatBox icon={FileText}    label="Total"        value={total}                    color="slate"   onClick={()=>{ setStatus(''); setPage(1); }}/>
         <StatBox icon={Clock}       label="Submitted"    value={counts['Submitted']||0}   color="blue"    onClick={()=>{ setStatus('Submitted'); setPage(1); }}/>
@@ -243,8 +271,8 @@ export default function AgentApplications() {
                 <th className="px-4 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
               </tr>
 
-              {/* Column filter row */}
-              {showFilters&&(
+              {/* Column filter row — hidden for employees */}
+              {showFilters && !isEmployee &&(
                 <tr className="border-b border-slate-100 bg-slate-50/50">
                   <td className="px-4 py-2"/>
                   <td className="px-2 py-2 min-w-[110px]">
@@ -256,12 +284,8 @@ export default function AgentApplications() {
                       <input className={inp} value={colFilters.last_name}  onChange={e=>setCol('last_name',e.target.value)}  placeholder="Last"/>
                     </div>
                   </td>
-                  <td className="px-2 py-2">
-                    <input className={inp} value={colFilters.program} onChange={e=>setCol('program',e.target.value)} placeholder="Filter program"/>
-                  </td>
-                  <td className="px-2 py-2">
-                    <input className={inp} value={colFilters.school} onChange={e=>setCol('school',e.target.value)} placeholder="Filter school"/>
-                  </td>
+                  <td className="px-2 py-2"><input className={inp} value={colFilters.program} onChange={e=>setCol('program',e.target.value)} placeholder="Filter program"/></td>
+                  <td className="px-2 py-2"><input className={inp} value={colFilters.school} onChange={e=>setCol('school',e.target.value)} placeholder="Filter school"/></td>
                   <td className="px-2 py-2">
                     <div className="space-y-1">
                       <input type="date" className={dat} value={colFilters.start_from} onChange={e=>setCol('start_from',e.target.value)}/>
@@ -298,11 +322,13 @@ export default function AgentApplications() {
                         <Inbox className="w-8 h-8 opacity-50"/>
                       </div>
                       <p className="font-semibold text-slate-500">No applications found</p>
-                      <p className="text-sm">Try adjusting your filters or create a new application</p>
-                      <button onClick={()=>router.push('/agent/applications/new')}
-                        className="mt-1 flex items-center gap-2 bg-brand-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm">
-                        <Plus className="w-4 h-4"/>New Application
-                      </button>
+                      <p className="text-sm">{isEmployee ? 'No applications for your assigned students yet' : 'Try adjusting your filters or create a new application'}</p>
+                      {can('add_applications') && (
+                        <button onClick={()=>router.push('/agent/applications/new')}
+                          className="mt-1 flex items-center gap-2 bg-brand-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm">
+                          <Plus className="w-4 h-4"/>New Application
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -319,55 +345,44 @@ export default function AgentApplications() {
                       <input type="checkbox" checked={isSelected} onChange={()=>toggleSelect(a.id)}
                         className="w-4 h-4 accent-brand-600 rounded cursor-pointer"/>
                     </td>
-
-                    {/* App ID */}
                     <td className="px-4 py-4">
-                      <span className="font-mono text-sm font-bold text-brand-600">
-                        {a.app_code}
-                      </span>
+                      <span className="font-mono text-sm font-bold text-brand-600">{a.app_code}</span>
                     </td>
-
-                    {/* Student */}
                     <td className="px-4 py-4" onClick={e=>e.stopPropagation()}>
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 bg-gradient-to-br from-brand-600 to-brand-400 rounded-xl flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-sm">
                           {initials}
                         </div>
                         <div>
-                          <button onClick={()=>viewStudent(a)}
-                            className="font-semibold text-sm text-slate-800 hover:text-brand-700 transition-colors leading-tight block">
-                            {studentName}
-                          </button>
+                          {/* View student — only if can_view_students */}
+                          {can('view_students') ? (
+                            <button onClick={()=>viewStudent(a)}
+                              className="font-semibold text-sm text-slate-800 hover:text-brand-700 transition-colors leading-tight block">
+                              {studentName}
+                            </button>
+                          ) : (
+                            <span className="font-semibold text-sm text-slate-800">{studentName}</span>
+                          )}
                           <div className="text-xs text-slate-400 mt-0.5">ID #{a.student_id}</div>
                         </div>
                       </div>
                     </td>
-
-                    {/* Program */}
                     <td className="px-4 py-4">
                       {a.program_name?(
                         <div>
-                          <span className="text-sm font-semibold text-slate-800 line-clamp-2 max-w-[200px] leading-snug block">
-                            {a.program_name}
-                          </span>
+                          <span className="text-sm font-semibold text-slate-800 line-clamp-2 max-w-[200px] leading-snug block">{a.program_name}</span>
                           {a.level&&<span className="text-xs text-slate-400 mt-0.5 block">{a.level}</span>}
                         </div>
                       ):<span className="text-slate-400 text-sm">—</span>}
                     </td>
-
-                    {/* University */}
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center shrink-0">
                           <span className="text-base">{a.flag||'🏫'}</span>
                         </div>
-                        <span className="text-sm font-semibold text-slate-800 line-clamp-2 max-w-[150px] leading-snug">
-                          {a.university_name||'—'}
-                        </span>
+                        <span className="text-sm font-semibold text-slate-800 line-clamp-2 max-w-[150px] leading-snug">{a.university_name||'—'}</span>
                       </div>
                     </td>
-
-                    {/* Intake */}
                     <td className="px-4 py-4">
                       {a.intake?(
                         <div className="flex items-center gap-1.5">
@@ -376,30 +391,26 @@ export default function AgentApplications() {
                         </div>
                       ):<span className="text-slate-400 text-sm">—</span>}
                     </td>
-
-                    {/* Applied */}
                     <td className="px-4 py-4">
                       <span className="text-sm text-slate-600 font-medium">
                         {a.applied_date?new Date(a.applied_date).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'—'}
                       </span>
                     </td>
-
-                    {/* Status */}
-                    <td className="px-4 py-4">
-                      <StatusBadge status={a.status}/>
-                    </td>
-
-                    {/* Actions */}
+                    <td className="px-4 py-4"><StatusBadge status={a.status}/></td>
                     <td className="px-4 py-4" onClick={e=>e.stopPropagation()}>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {/* View app — always */}
                         <button onClick={()=>viewApp(a)} title="View application"
                           className="p-2 rounded-lg hover:bg-brand-50 hover:text-brand-600 text-slate-400 transition-colors">
                           <Eye className="w-4 h-4"/>
                         </button>
-                        <button onClick={()=>viewStudent(a)} title="View student profile"
-                          className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
-                          <Users className="w-4 h-4"/>
-                        </button>
+                        {/* View student — only if can_view_students */}
+                        {can('view_students') && (
+                          <button onClick={()=>viewStudent(a)} title="View student profile"
+                            className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+                            <Users className="w-4 h-4"/>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -417,17 +428,15 @@ export default function AgentApplications() {
         )}
       </div>
 
-      {/* Pagination */}
-      {!loading&&pages>1&&(
+      {/* Pagination — hide for employees */}
+      {!loading && pages>1 && !isEmployee && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-slate-500 font-medium">
             Page {page} of {pages} · {((page-1)*LIMIT)+1}–{Math.min(page*LIMIT,total)} of {total}
           </span>
           <div className="flex items-center gap-1.5">
-            <button onClick={()=>setPage(1)} disabled={page<=1}
-              className="px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-40 bg-white text-xs font-bold text-slate-600 transition-colors">First</button>
-            <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page<=1}
-              className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-40 bg-white transition-colors">
+            <button onClick={()=>setPage(1)} disabled={page<=1} className="px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-40 bg-white text-xs font-bold text-slate-600">First</button>
+            <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page<=1} className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-40 bg-white transition-colors">
               <ChevronLeft className="w-4 h-4 text-slate-600"/>
             </button>
             {Array.from({length:Math.min(5,pages)},(_,i)=>{
@@ -435,12 +444,10 @@ export default function AgentApplications() {
               return <button key={p} onClick={()=>setPage(p)}
                 className={`w-10 h-10 rounded-xl border text-sm font-bold transition-all ${p===page?'bg-brand-700 text-white border-brand-700 shadow-sm':'border-slate-200 hover:bg-slate-50 bg-white text-slate-700'}`}>{p}</button>;
             })}
-            <button onClick={()=>setPage(p=>Math.min(pages,p+1))} disabled={page>=pages}
-              className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-40 bg-white transition-colors">
+            <button onClick={()=>setPage(p=>Math.min(pages,p+1))} disabled={page>=pages} className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-40 bg-white transition-colors">
               <ChevronRight className="w-4 h-4 text-slate-600"/>
             </button>
-            <button onClick={()=>setPage(pages)} disabled={page>=pages}
-              className="px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-40 bg-white text-xs font-bold text-slate-600 transition-colors">Last</button>
+            <button onClick={()=>setPage(pages)} disabled={page>=pages} className="px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-40 bg-white text-xs font-bold text-slate-600">Last</button>
           </div>
         </div>
       )}

@@ -2,7 +2,6 @@
 import bcrypt from 'bcryptjs';
 import { withAuth } from '../../../lib/auth';
 import { paginate, searchLike } from '../../../lib/apiHelper';
-// import { DEV_AGENTS } from '../../../lib/devData';
 
 async function handler(req, res) {
   if (req.method === 'GET') {
@@ -27,10 +26,8 @@ async function handler(req, res) {
       const [{ cnt }] = await query(`SELECT COUNT(*) AS cnt FROM agents ag JOIN users u ON u.id=ag.user_id ${where}`, params);
       return res.json({ agents, total: cnt });
     } catch (err) {
-      let data = [...DEV_AGENTS];
-      if (search) { const q = search.toLowerCase(); data = data.filter(a => a.name.toLowerCase().includes(q)); }
-      if (status) data = data.filter(a => a.status === status);
-      return res.json({ agents: data.slice(offset, offset + limit), total: data.length });
+      console.error('[agents GET]', err.message);
+      return res.json({ agents: [], total: 0 });
     }
   }
 

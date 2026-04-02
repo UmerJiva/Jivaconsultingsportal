@@ -1,4 +1,4 @@
-// pages/admin/agent/[id].js — Full agent detail + live chat
+// pages/admin/agent/[id].js
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from '../../../components/layout/AdminLayout';
@@ -11,17 +11,18 @@ import {
   ExternalLink, Plus, Check, AlertCircle
 } from 'lucide-react';
 import { apiCall } from '../../../lib/useApi';
+import useAdminPermissions from '../../../lib/useAdminPermissions';
 
 const inp = "w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white placeholder-slate-300";
 const sel = "w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white text-slate-700";
 
 const STATUS_COLORS = {
-  'Submitted':'bg-blue-50 text-blue-700 border-blue-200',
+  'Submitted':   'bg-blue-50 text-blue-700 border-blue-200',
   'Under Review':'bg-amber-50 text-amber-700 border-amber-200',
-  'Accepted':'bg-emerald-50 text-emerald-700 border-emerald-200',
-  'Rejected':'bg-red-50 text-red-600 border-red-200',
-  'Enrolled':'bg-green-50 text-green-700 border-green-200',
-  'Pending':'bg-slate-100 text-slate-600 border-slate-200',
+  'Accepted':    'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'Rejected':    'bg-red-50 text-red-600 border-red-200',
+  'Enrolled':    'bg-green-50 text-green-700 border-green-200',
+  'Pending':     'bg-slate-100 text-slate-600 border-slate-200',
 };
 
 function FL({ label, hint, children }) {
@@ -52,7 +53,7 @@ function Section({ icon: Icon, title, children, defaultOpen=true, color='brand' 
   );
 }
 
-// ── Live Chat Component ────────────────────────────────────────
+// ── Live Chat Component ───────────────────────────────────────
 function LiveChat({ agentId, agentName }) {
   const [messages, setMessages] = useState([]);
   const [message, setMessage]   = useState('');
@@ -60,7 +61,6 @@ function LiveChat({ agentId, agentName }) {
   const [loading, setLoading]   = useState(true);
   const bottomRef = useRef(null);
 
-  // agentId IS the chat channel — no conversation lookup needed
   async function loadMessages() {
     if (!agentId) return;
     try {
@@ -72,8 +72,6 @@ function LiveChat({ agentId, agentName }) {
 
   useEffect(() => { if (agentId) { setLoading(true); loadMessages(); } }, [agentId]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:'smooth' }); }, [messages]);
-
-  // Poll every 5s
   useEffect(() => {
     if (!agentId) return;
     const t = setInterval(loadMessages, 5000);
@@ -97,7 +95,6 @@ function LiveChat({ agentId, agentName }) {
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col" style={{height:'500px'}}>
-      {/* Header */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-200 bg-brand-700 shrink-0">
         <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
           <MessageSquare className="w-4 h-4 text-white"/>
@@ -113,7 +110,6 @@ function LiveChat({ agentId, agentName }) {
         </button>
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
         {loading ? (
           <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-slate-400"/></div>
@@ -136,26 +132,25 @@ function LiveChat({ agentId, agentName }) {
                   <div className="flex-1 h-px bg-slate-200"/>
                 </div>
               )}
-            <div className={`flex gap-2 ${isAdmin ? 'flex-row-reverse' : ''}`}>
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${isAdmin ? 'bg-brand-600' : 'bg-slate-500'}`}>
-                {(msg.sender_name||'?')[0].toUpperCase()}
-              </div>
-              <div className={`max-w-[72%] flex flex-col ${isAdmin ? 'items-end' : 'items-start'}`}>
-                <div className={`text-[10px] text-slate-400 mb-1 ${isAdmin ? 'text-right' : ''}`}>
-                  {msg.sender_name} · {date.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}
+              <div className={`flex gap-2 ${isAdmin ? 'flex-row-reverse' : ''}`}>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${isAdmin ? 'bg-brand-600' : 'bg-slate-500'}`}>
+                  {(msg.sender_name||'?')[0].toUpperCase()}
                 </div>
-                <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm ${isAdmin ? 'bg-brand-600 text-white rounded-tr-sm' : 'bg-white text-slate-800 rounded-tl-sm border border-slate-200'}`}>
-                  {msg.message}
+                <div className={`max-w-[72%] flex flex-col ${isAdmin ? 'items-end' : 'items-start'}`}>
+                  <div className={`text-[10px] text-slate-400 mb-1 ${isAdmin ? 'text-right' : ''}`}>
+                    {msg.sender_name} · {date.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}
+                  </div>
+                  <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm ${isAdmin ? 'bg-brand-600 text-white rounded-tr-sm' : 'bg-white text-slate-800 rounded-tl-sm border border-slate-200'}`}>
+                    {msg.message}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
           );
         })}
         <div ref={bottomRef}/>
       </div>
 
-      {/* Input */}
       <div className="px-4 py-3 border-t border-slate-200 bg-white shrink-0">
         <div className="flex gap-2">
           <input value={message} onChange={e=>setMessage(e.target.value)}
@@ -178,6 +173,10 @@ function LiveChat({ agentId, agentName }) {
 export default function AdminAgentDetail() {
   const router = useRouter();
   const { id } = router.query;
+
+  // ── PERMISSIONS ──────────────────────────────────────────────
+  const { can } = useAdminPermissions();
+
   const [agent, setAgent]   = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving,  setSaving]  = useState(false);
@@ -229,12 +228,13 @@ export default function AdminAgentDetail() {
   const initials = agent.name?.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase() || '?';
   const acceptRate = Number(stats.total_apps)>0 ? Math.round((Number(stats.accepted_apps||0)/Number(stats.total_apps))*100) : 0;
 
+  // ── PERMISSION GATE: Only show Edit Profile tab if can edit agents ──
   const TABS = [
     { key:'overview',  label:'Overview'      },
-    { key:'edit',      label:'Edit Profile'  },
-    { key:'students',  label:`Students (${students.length})`    },
+    ...(can('agents', 'edit') ? [{ key:'edit', label:'Edit Profile' }] : []),
+    { key:'students',  label:`Students (${students.length})`         },
     { key:'apps',      label:`Applications (${applications.length})` },
-    { key:'chat',      label:'Live Chat'     },
+    ...(can('chat', 'view') ? [{ key:'chat', label:'Live Chat' }] : []),
   ];
 
   return (
@@ -266,11 +266,10 @@ export default function AdminAgentDetail() {
 
         <div className="flex gap-5">
 
-          {/* ── LEFT SIDEBAR ── */}
+          {/* LEFT SIDEBAR */}
           <div className="w-72 shrink-0">
             <div className="sticky top-4 space-y-4">
 
-              {/* Agent card */}
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="h-16 bg-gradient-to-r from-brand-700 to-brand-500"/>
                 <div className="px-5 pb-5 -mt-8">
@@ -288,17 +287,16 @@ export default function AdminAgentDetail() {
                 </div>
               </div>
 
-              {/* Performance stats */}
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
                 <h3 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-brand-500"/>Performance</h3>
                 <div className="space-y-3">
                   {[
-                    { label:'Total Students', value:stats.total_students||0, color:'text-slate-800'   },
+                    { label:'Total Students', value:stats.total_students||0,  color:'text-slate-800'   },
                     { label:'Active',          value:stats.active_students||0, color:'text-emerald-600' },
-                    { label:'Applications',    value:stats.total_apps||0,     color:'text-slate-800'   },
-                    { label:'Accepted',        value:stats.accepted_apps||0,  color:'text-emerald-600' },
-                    { label:'Enrolled',        value:stats.enrolled||0,       color:'text-brand-600'   },
-                    { label:'Accept Rate',     value:`${acceptRate}%`,        color:'text-emerald-600' },
+                    { label:'Applications',    value:stats.total_apps||0,      color:'text-slate-800'   },
+                    { label:'Accepted',        value:stats.accepted_apps||0,   color:'text-emerald-600' },
+                    { label:'Enrolled',        value:stats.enrolled||0,        color:'text-brand-600'   },
+                    { label:'Accept Rate',     value:`${acceptRate}%`,         color:'text-emerald-600' },
                     { label:'Commission',      value:`$${Number(agent.commission_total||0).toLocaleString()}`, color:'text-emerald-700' },
                   ].map(s=>(
                     <div key={s.label} className="flex items-center justify-between text-xs py-1.5 border-b border-slate-100 last:border-0">
@@ -309,7 +307,6 @@ export default function AdminAgentDetail() {
                 </div>
               </div>
 
-              {/* Agreement & Certificate */}
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
                 <h3 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2"><Award className="w-4 h-4 text-amber-500"/>Documents</h3>
                 <div className="space-y-2">
@@ -334,15 +331,17 @@ export default function AdminAgentDetail() {
                 </div>
               </div>
 
-              {/* Quick chat button */}
-              <button onClick={()=>setActiveTab('chat')}
-                className="w-full flex items-center justify-center gap-2 bg-brand-700 hover:bg-brand-800 text-white font-bold py-3 rounded-2xl text-sm transition-colors shadow-sm">
-                <MessageSquare className="w-4 h-4"/>Chat with Agent
-              </button>
+              {/* ── PERMISSION GATE: Chat button — only if can('chat','view') ── */}
+              {can('chat', 'view') && (
+                <button onClick={()=>setActiveTab('chat')}
+                  className="w-full flex items-center justify-center gap-2 bg-brand-700 hover:bg-brand-800 text-white font-bold py-3 rounded-2xl text-sm transition-colors shadow-sm">
+                  <MessageSquare className="w-4 h-4"/>Chat with Agent
+                </button>
+              )}
             </div>
           </div>
 
-          {/* ── MAIN CONTENT ── */}
+          {/* MAIN CONTENT */}
           <div className="flex-1 min-w-0">
 
             {/* Tab bar */}
@@ -355,10 +354,9 @@ export default function AdminAgentDetail() {
               ))}
             </div>
 
-            {/* ── OVERVIEW ── */}
+            {/* OVERVIEW */}
             {activeTab === 'overview' && (
               <div className="space-y-4">
-                {/* Stats grid */}
                 <div className="grid grid-cols-4 gap-3">
                   {[
                     { icon:Users,       label:'Students',     value:stats.total_students||0,  bg:'bg-brand-50',   color:'text-brand-600'   },
@@ -374,7 +372,6 @@ export default function AdminAgentDetail() {
                   ))}
                 </div>
 
-                {/* Recent students */}
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                   <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
                     <h3 className="font-bold text-slate-800 flex items-center gap-2"><Users className="w-4 h-4 text-brand-500"/>Recent Students</h3>
@@ -398,7 +395,6 @@ export default function AdminAgentDetail() {
                   })}
                 </div>
 
-                {/* Notes */}
                 {agent.notes && (
                   <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
                     <div className="text-xs font-bold text-amber-700 mb-2 uppercase tracking-wider">Admin Notes</div>
@@ -408,8 +404,8 @@ export default function AdminAgentDetail() {
               </div>
             )}
 
-            {/* ── EDIT PROFILE ── */}
-            {activeTab === 'edit' && (
+            {/* EDIT PROFILE — only rendered if can('agents','edit') */}
+            {activeTab === 'edit' && can('agents', 'edit') && (
               <div>
                 {saved && <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-xl px-4 py-3 mb-4"><CheckCircle className="w-4 h-4"/>Profile saved successfully!</div>}
 
@@ -468,6 +464,7 @@ export default function AdminAgentDetail() {
                   <textarea rows={4} className={inp+' resize-none mt-2'} value={form.notes} onChange={e=>f('notes',e.target.value)} placeholder="Internal notes about this agent…"/>
                 </Section>
 
+                {/* ── PERMISSION GATE: Save button ── */}
                 <div className="flex justify-end">
                   <button onClick={handleSave} disabled={saving}
                     className="flex items-center gap-2 bg-brand-700 hover:bg-brand-800 text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors shadow-sm disabled:opacity-60">
@@ -478,17 +475,14 @@ export default function AdminAgentDetail() {
               </div>
             )}
 
-            {/* ── STUDENTS ── */}
+            {/* STUDENTS */}
             {activeTab === 'students' && (
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100">
                   <h3 className="font-bold text-slate-800">Students ({students.length})</h3>
                 </div>
                 {students.length===0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-                    <Users className="w-10 h-10 mb-2 opacity-40"/>
-                    <p className="text-sm">No students yet</p>
-                  </div>
+                  <div className="flex flex-col items-center justify-center py-16 text-slate-400"><Users className="w-10 h-10 mb-2 opacity-40"/><p className="text-sm">No students yet</p></div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -498,12 +492,7 @@ export default function AdminAgentDetail() {
                           const name = s.first_name ? `${s.first_name} ${s.last_name||''}`.trim() : s.name;
                           return (
                             <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-7 h-7 bg-brand-100 rounded-full flex items-center justify-center text-brand-700 text-xs font-bold shrink-0">{name[0]?.toUpperCase()||'?'}</div>
-                                  <span className="text-sm font-semibold text-slate-800 truncate max-w-[120px]">{name}</span>
-                                </div>
-                              </td>
+                              <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="w-7 h-7 bg-brand-100 rounded-full flex items-center justify-center text-brand-700 text-xs font-bold shrink-0">{name[0]?.toUpperCase()||'?'}</div><span className="text-sm font-semibold text-slate-800 truncate max-w-[120px]">{name}</span></div></td>
                               <td className="px-4 py-3 text-xs text-slate-500 truncate max-w-[150px]">{s.email}</td>
                               <td className="px-4 py-3 text-xs text-slate-600">{s.education_level||'—'}</td>
                               <td className="px-4 py-3 text-xs font-semibold text-slate-700">{s.gpa||'—'}</td>
@@ -520,17 +509,14 @@ export default function AdminAgentDetail() {
               </div>
             )}
 
-            {/* ── APPLICATIONS ── */}
+            {/* APPLICATIONS */}
             {activeTab === 'apps' && (
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100">
                   <h3 className="font-bold text-slate-800">Applications ({applications.length})</h3>
                 </div>
                 {applications.length===0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-                    <FileText className="w-10 h-10 mb-2 opacity-40"/>
-                    <p className="text-sm">No applications yet</p>
-                  </div>
+                  <div className="flex flex-col items-center justify-center py-16 text-slate-400"><FileText className="w-10 h-10 mb-2 opacity-40"/><p className="text-sm">No applications yet</p></div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -553,8 +539,8 @@ export default function AdminAgentDetail() {
               </div>
             )}
 
-            {/* ── LIVE CHAT ── */}
-            {activeTab === 'chat' && (
+            {/* LIVE CHAT — only rendered if can('chat','view') */}
+            {activeTab === 'chat' && can('chat', 'view') && (
               <LiveChat agentId={parseInt(id)} agentName={agent.name}/>
             )}
 

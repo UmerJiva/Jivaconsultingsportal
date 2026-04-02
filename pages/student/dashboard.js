@@ -143,7 +143,7 @@ export default function StudentDashboard() {
         <Section title="Start Applying" defaultOpen={false}>
           <p className="text-slate-500 text-sm mb-5">Find programs and submit your applications.</p>
           <div className="mb-4">
-            <Link href="/student/universities"
+            <Link href="/student/onboarding"
               className="inline-flex items-center gap-2 border-2 border-brand-500 text-brand-600 hover:bg-brand-50 font-bold px-5 py-2.5 rounded-xl transition-colors text-sm">
               Find A Program <ArrowRight className="w-4 h-4" />
             </Link>

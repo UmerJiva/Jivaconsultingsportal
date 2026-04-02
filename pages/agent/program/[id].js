@@ -1,7 +1,8 @@
 // pages/agent/program/[id].js — Program detail page
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from '../../../components/layout/AdminLayout';
+import ApplicationWizard from '../../../components/ApplicationWizard';
 import { Spinner } from '../../../components/ui/index';
 import {
   ArrowLeft, Heart, ExternalLink, X, ChevronDown, ChevronUp,
@@ -112,6 +113,8 @@ export default function ProgramDetail() {
   const [showServices, setShowServices] = useState(true);
   const [liked, setLiked] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const scrollRef = useRef(null);
 
   const TABS = ['overview','admission_requirements','scholarships','similar_programs'];
   const TAB_LABELS = { overview:'Overview', admission_requirements:'Admission Requirements', scholarships:'Scholarships', similar_programs:'Similar Programs' };
@@ -123,20 +126,29 @@ export default function ProgramDetail() {
 
   useEffect(()=>{
     if (!prog) return;
+    const container = scrollRef.current;
+    if (!container) return;
     const handler = () => {
+      const containerTop = container.getBoundingClientRect().top;
       for (const tab of [...TABS].reverse()) {
         const el = document.getElementById(tab);
-        if (el && el.getBoundingClientRect().top <= 100) { setActiveTab(tab); break; }
+        if (el && el.getBoundingClientRect().top - containerTop <= 80) {
+          setActiveTab(tab); break;
+        }
       }
     };
-    window.addEventListener('scroll', handler, { passive:true });
-    return () => window.removeEventListener('scroll', handler);
+    container.addEventListener('scroll', handler, { passive:true });
+    return () => container.removeEventListener('scroll', handler);
   }, [prog]);
 
   function scrollTo(tab) {
-    const el = document.getElementById(tab);
-    if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior:'smooth' });
     setActiveTab(tab);
+    const container = scrollRef.current;
+    const el = document.getElementById(tab);
+    if (!container || !el) return;
+    const containerTop = container.getBoundingClientRect().top;
+    const elTop = el.getBoundingClientRect().top;
+    container.scrollBy({ top: elTop - containerTop - 60, behavior: 'smooth' });
   }
 
   if (loading) return <AdminLayout title="Program"><div className="flex justify-center py-20"><Spinner size="lg"/></div></AdminLayout>;
@@ -159,7 +171,9 @@ export default function ProgramDetail() {
 
   return (
     <AdminLayout title={prog.name}>
-      <div className="max-w-full">
+      {/* Scroll container — all content scrolls here so sticky tab bar works */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto -m-4 lg:-m-6" style={{height:'calc(100vh - 64px)'}}>
+      <div className="max-w-full p-4 lg:p-6">
 
         {/* ── Back button ── */}
         <button onClick={()=>router.back()} className="flex items-center gap-2 text-sm text-slate-500 hover:text-brand-600 mb-4 transition-colors">
@@ -255,13 +269,13 @@ export default function ProgramDetail() {
           )}
         </div>
 
-        {/* ── Sticky tab bar ── */}
-        <div className="sticky top-0 z-20 bg-white border-b border-slate-200 shadow-sm mb-0">
-          <div className="flex overflow-x-auto">
+        {/* ── Sticky tab bar — sticks inside our scroll container ── */}
+        <div className="sticky top-0 z-20 bg-white border border-slate-200 rounded-2xl shadow-sm mb-5 overflow-hidden">
+          <div className="flex">
             {TABS.map(tab=>(
               <button key={tab} onClick={()=>scrollTo(tab)}
-                className={`px-6 py-3.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap -mb-px
-                  ${activeTab===tab?'border-brand-600 text-brand-700':'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                className={`flex-1 px-4 py-3.5 text-sm font-bold border-b-2 transition-colors whitespace-nowrap text-center
+                  ${activeTab===tab?'border-brand-600 text-brand-700 bg-brand-50':'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>
                 {TAB_LABELS[tab]}
               </button>
             ))}
@@ -431,11 +445,11 @@ export default function ProgramDetail() {
 
           {/* ── Right sidebar ── */}
           <div className="w-72 shrink-0">
-            <div className="sticky top-20 space-y-4">
+            <div className="sticky top-2 space-y-4">
 
               {/* Create application + wishlist */}
               <div className="flex gap-2">
-                <button disabled={applying} onClick={()=>setApplying(true)}
+                <button onClick={()=>setWizardOpen(true)}
                   className="flex-1 flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 px-4 rounded-xl text-sm transition-colors shadow-sm border-2 border-brand-600">
                   Create application <ExternalLink className="w-4 h-4"/>
                 </button>
@@ -457,7 +471,7 @@ export default function ProgramDetail() {
                   ].map(([Icon, v, label])=>(
                     <div key={label} className="flex items-center gap-3 py-3.5 first:pt-0 last:pb-0">
                       <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
-                        <Icon className="w-4.5 h-4.5 text-slate-500"/>
+                        <Icon className="w-5 h-5 text-slate-500"/>
                       </div>
                       <div>
                         <div className="font-bold text-slate-800 text-sm">{v}</div>
@@ -578,10 +592,19 @@ export default function ProgramDetail() {
             </div>
           </div>
         </div>
-      </div>
+      </div>{/* end max-w-full */}
+      </div>{/* end scroll container */}
 
       {/* Lightbox */}
       <Gallery photos={photos} show={lightbox.show} startIndex={lightbox.index} onClose={()=>setLightbox({show:false,index:0})}/>
+
+      {/* Application Wizard */}
+      <ApplicationWizard
+        open={wizardOpen}
+        program={prog}
+        userRole="agent"
+        onClose={()=>setWizardOpen(false)}
+      />
     </AdminLayout>
   );
 }

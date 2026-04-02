@@ -1,5 +1,4 @@
 // pages/admin/program/[id]/requirements.js
-// Admin: set application requirements per program (eligibility, prereqs, documents, guidelines)
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from '../../../../components/layout/AdminLayout';
@@ -7,15 +6,41 @@ import { Spinner } from '../../../../components/ui/index';
 import {
   ArrowLeft, Save, Plus, Trash2, CheckCircle, AlertCircle,
   Loader2, FileText, Shield, Info, ChevronDown, ChevronUp,
-  AlertTriangle, Eye, Settings
+  AlertTriangle, Eye, Flag
 } from 'lucide-react';
 import { apiCall } from '../../../../lib/useApi';
 
 const inp = "w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white placeholder-slate-300 transition-colors";
 const sel = "w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white text-slate-700 transition-colors";
 const ta  = inp + " resize-none";
-const EDU_LEVELS = ['High School','Grade 10 (Pakistan)','Diploma','Certificate','Bachelors (Pakistan)','Bachelors (Turkey)','Masters (Pakistan)','Masters (Turkey)','PhD'];
-const DOC_TYPES  = ['Document','Certificate','Photo','Scan','Other'];
+
+const EDU_LEVELS  = ['High School','Grade 10 (Pakistan)','Diploma','Certificate','Bachelors (Pakistan)','Bachelors (Turkey)','Masters (Pakistan)','Masters (Turkey)','PhD'];
+const DOC_TYPES   = ['Document','Certificate','Photo','Scan','Other'];
+
+// Must match PIPELINE_STEPS in application detail page
+const APP_STEPS = [
+  { key:'',                  label:'All Steps (always visible)' },
+  { key:'created',           label:'Application Created'        },
+  { key:'started',           label:'Application Started'        },
+  { key:'review',            label:'Under Review'               },
+  { key:'submitting',        label:'Submitted to School'        },
+  { key:'awaiting',          label:'Awaiting Decision'          },
+  { key:'admission',         label:'Admission Processing'       },
+  { key:'pre_arrival',       label:'Pre-Arrival'                },
+  { key:'arrival',           label:'Arrival'                    },
+];
+
+const STEP_COLORS = {
+  '':            'bg-slate-100 text-slate-500',
+  'created':     'bg-brand-100 text-brand-700',
+  'started':     'bg-sky-100 text-sky-700',
+  'review':      'bg-amber-100 text-amber-700',
+  'submitting':  'bg-blue-100 text-blue-700',
+  'awaiting':    'bg-purple-100 text-purple-700',
+  'admission':   'bg-emerald-100 text-emerald-700',
+  'pre_arrival': 'bg-teal-100 text-teal-700',
+  'arrival':     'bg-green-100 text-green-700',
+};
 
 function FL({ label, hint, children }) {
   return (
@@ -60,8 +85,17 @@ export default function ProgramRequirements() {
   const [saved,   setSaved]   = useState(false);
   const [error,   setError]   = useState('');
 
-  const [elig, setElig] = useState({ min_education_level:'', min_gpa:'', min_ielts:'', min_toefl:'', min_pte:'', min_duolingo:'', post_study_work_visa:false, commission_text:'', commission_breakdown:'' });
-  const [guidelines, setGuidelines] = useState({ eligibility_guideline:'Please select a student to check their eligibility for this program.', intake_guideline:'Select the academic intake for this application.', prerequisites_guideline:'Please review the following carefully. If the student does not meet these prerequisites the application will be cancelled.', backups_guideline:'Choose up to 10 backup programs in order of preference.', documents_guideline:'Please carefully review the following. You will need these documents to complete the application.' });
+  const [elig, setElig] = useState({
+    min_education_level:'', min_gpa:'', min_ielts:'', min_toefl:'', min_pte:'', min_duolingo:'',
+    post_study_work_visa:false, commission_text:'', commission_breakdown:''
+  });
+  const [guidelines, setGuidelines] = useState({
+    eligibility_guideline:'Please select a student to check their eligibility for this program.',
+    intake_guideline:'Select the academic intake for this application.',
+    prerequisites_guideline:'Please review the following carefully. If the student does not meet these prerequisites the application will be cancelled.',
+    backups_guideline:'Choose up to 10 backup programs in order of preference.',
+    documents_guideline:'Please carefully review the following. You will need these documents to complete the application.'
+  });
   const [prerequisites, setPrerequisites] = useState([]);
   const [documents,     setDocuments]     = useState([]);
 
@@ -74,15 +108,29 @@ export default function ProgramRequirements() {
     ]).then(([prog, reqData]) => {
       setProgram(prog);
       const r = reqData.requirements || {};
-      setElig({ min_education_level:r.min_education_level||prog.min_education_level||'', min_gpa:r.min_gpa||prog.min_gpa||'', min_ielts:r.min_ielts||prog.min_ielts||'', min_toefl:r.min_toefl||prog.min_toefl||'', min_pte:r.min_pte||prog.min_pte||'', min_duolingo:r.min_duolingo||'', post_study_work_visa:!!(r.post_study_work_visa||prog.post_study_work_visa), commission_text:r.commission_text||prog.commission_text||'', commission_breakdown:r.commission_breakdown||prog.commission_breakdown||'' });
-      setGuidelines({ eligibility_guideline:r.eligibility_guideline||'Please select a student to check their eligibility for this program.', intake_guideline:r.intake_guideline||'Select the academic intake for this application.', prerequisites_guideline:r.prerequisites_guideline||'Please review the following carefully. If the student does not meet these prerequisites the application will be cancelled.', backups_guideline:r.backups_guideline||'Choose up to 10 backup programs in order of preference.', documents_guideline:r.documents_guideline||'Please carefully review the following. You will need these documents to complete the application.' });
+      setElig({
+        min_education_level: r.min_education_level||prog.min_education_level||'',
+        min_gpa:    r.min_gpa||prog.min_gpa||'',
+        min_ielts:  r.min_ielts||prog.min_ielts||'',
+        min_toefl:  r.min_toefl||prog.min_toefl||'',
+        min_pte:    r.min_pte||prog.min_pte||'',
+        min_duolingo: r.min_duolingo||'',
+        post_study_work_visa: !!(r.post_study_work_visa||prog.post_study_work_visa),
+        commission_text: r.commission_text||prog.commission_text||'',
+        commission_breakdown: r.commission_breakdown||prog.commission_breakdown||''
+      });
+      setGuidelines({
+        eligibility_guideline:   r.eligibility_guideline   || 'Please select a student to check their eligibility for this program.',
+        intake_guideline:        r.intake_guideline        || 'Select the academic intake for this application.',
+        prerequisites_guideline: r.prerequisites_guideline || 'Please review the following carefully. If the student does not meet these prerequisites the application will be cancelled.',
+        backups_guideline:       r.backups_guideline       || 'Choose up to 10 backup programs in order of preference.',
+        documents_guideline:     r.documents_guideline     || 'Please carefully review the following. You will need these documents to complete the application.'
+      });
 
       if (reqData.prerequisites?.length > 0) {
         setPrerequisites(reqData.prerequisites.map(p=>({ id:p.id, title:p.title, body:p.body||'' })));
       } else {
-        const arr = (() => { if (!prog.prerequisites) return []; if (Array.isArray(prog.prerequisites)) return prog.prerequisites; try { return JSON.parse(prog.prerequisites); } catch { return []; } })();
-        if (arr.length > 0) setPrerequisites(arr.map((p,i)=>({ id:i+1, title:p.title||'', body:p.body||'' })));
-        else setPrerequisites([
+        setPrerequisites([
           { id:1, title:'Country Specific GPA - Pakistan', body:"For applicants educated in Pakistan, this program requires: Bachelor's degree from Pakistan studied over 4-5 years or Bachelor of Law with minimum GPA 55% from a recognized academic institute." },
           { id:2, title:'English Test Validity', body:'The English test must be valid at the start date of the desired program.' },
           { id:3, title:'Overqualified Degree', body:"The program does not accept applicants already holding a master's degree in a related subject area." },
@@ -92,29 +140,31 @@ export default function ProgramRequirements() {
       }
 
       if (reqData.documents?.length > 0) {
-        setDocuments(reqData.documents.map(d=>({ id:d.id, name:d.name, doc_type:d.doc_type||'', description:d.description||'', required:!!d.required })));
+        setDocuments(reqData.documents.map(d=>({
+          id: d.id, name: d.name, doc_type: d.doc_type||'',
+          description: d.description||'', required: !!d.required,
+          application_step: d.application_step||''
+        })));
       } else {
-        const arr = (() => { if (!prog.required_documents) return []; if (Array.isArray(prog.required_documents)) return prog.required_documents; try { return JSON.parse(prog.required_documents); } catch { return []; } })();
-        if (arr.length > 0) setDocuments(arr.map((d,i)=>({ id:i+1, name:d.name||'', doc_type:d.type||'', description:'', required:true })));
-        else setDocuments([
-          { id:1, name:'Copy of Education Transcripts', doc_type:'Document', description:'Official transcripts from all attended institutions.', required:true },
-          { id:2, name:'Copy of Education Certificate', doc_type:'Document', description:'Degree or diploma certificate.', required:true },
-          { id:3, name:'Passport Copy', doc_type:'', description:'Clear copy of the biographical page of the passport.', required:true },
-          { id:4, name:'English Language Proficiency Test', doc_type:'', description:'IELTS, TOEFL, PTE or equivalent results.', required:true },
-          { id:5, name:'Resume', doc_type:'', description:'Up-to-date curriculum vitae.', required:true },
-          { id:6, name:'Hybrid Immigration History', doc_type:'', description:'Immigration history documentation if applicable.', required:false },
-          { id:7, name:'Study Gap Explanation', doc_type:'', description:'Letter explaining any gaps in education.', required:false },
+        setDocuments([
+          { id:1, name:'Copy of Education Transcripts',         doc_type:'Document', description:'Official transcripts from all attended institutions.', required:true,  application_step:'started'  },
+          { id:2, name:'Copy of Education Certificate',         doc_type:'Document', description:'Degree or diploma certificate.',                        required:true,  application_step:'started'  },
+          { id:3, name:'Passport Copy',                         doc_type:'',         description:'Clear copy of the biographical page of the passport.',   required:true,  application_step:'started'  },
+          { id:4, name:'English Language Proficiency Test',     doc_type:'',         description:'IELTS, TOEFL, PTE or equivalent results.',              required:true,  application_step:'started'  },
+          { id:5, name:'Resume',                                doc_type:'',         description:'Up-to-date curriculum vitae.',                           required:true,  application_step:'started'  },
+          { id:6, name:'Hybrid Immigration History',            doc_type:'',         description:'Immigration history documentation if applicable.',       required:false, application_step:'review'   },
+          { id:7, name:'Study Gap Explanation',                 doc_type:'',         description:'Letter explaining any gaps in education.',               required:false, application_step:'review'   },
         ]);
       }
     }).finally(()=>setLoading(false));
   }, [id]);
 
-  const addPrereq   = () => setPrerequisites(p=>[...p,{id:Date.now(),title:'',body:''}]);
+  const addPrereq    = () => setPrerequisites(p=>[...p,{id:Date.now(),title:'',body:''}]);
   const removePrereq = idx => setPrerequisites(p=>p.filter((_,i)=>i!==idx));
-  const upPrereq    = (idx,k,v) => setPrerequisites(p=>{ const n=[...p]; n[idx]={...n[idx],[k]:v}; return n; });
-  const movePrereq  = (idx,dir) => setPrerequisites(p=>{ const n=[...p],to=idx+dir; if(to<0||to>=n.length)return p; [n[idx],n[to]]=[n[to],n[idx]]; return n; });
+  const upPrereq     = (idx,k,v) => setPrerequisites(p=>{ const n=[...p]; n[idx]={...n[idx],[k]:v}; return n; });
+  const movePrereq   = (idx,dir) => setPrerequisites(p=>{ const n=[...p],to=idx+dir; if(to<0||to>=n.length)return p; [n[idx],n[to]]=[n[to],n[idx]]; return n; });
 
-  const addDoc    = () => setDocuments(d=>[...d,{id:Date.now(),name:'',doc_type:'',description:'',required:true}]);
+  const addDoc    = () => setDocuments(d=>[...d,{id:Date.now(),name:'',doc_type:'',description:'',required:true,application_step:''}]);
   const removeDoc = idx => setDocuments(d=>d.filter((_,i)=>i!==idx));
   const upDoc     = (idx,k,v) => setDocuments(d=>{ const n=[...d]; n[idx]={...n[idx],[k]:v}; return n; });
   const moveDoc   = (idx,dir) => setDocuments(d=>{ const n=[...d],to=idx+dir; if(to<0||to>=n.length)return d; [n[idx],n[to]]=[n[to],n[idx]]; return n; });
@@ -130,6 +180,14 @@ export default function ProgramRequirements() {
 
   if (loading) return <AdminLayout title="Application Requirements"><div className="flex justify-center py-20"><Spinner size="lg"/></div></AdminLayout>;
   if (!program||program.error) return <AdminLayout title="Requirements"><div className="text-center py-20 text-slate-400">Program not found</div></AdminLayout>;
+
+  // Group documents by step for preview
+  const docsByStep = {};
+  documents.forEach(d => {
+    const step = d.application_step || '';
+    if (!docsByStep[step]) docsByStep[step] = [];
+    docsByStep[step].push(d);
+  });
 
   return (
     <AdminLayout title="Application Requirements">
@@ -163,9 +221,9 @@ export default function ProgramRequirements() {
         </div>
 
         {error && <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3 mb-4"><AlertCircle className="w-4 h-4 shrink-0"/>{error}</div>}
-        {saved  && <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-xl px-4 py-3 mb-4"><CheckCircle className="w-4 h-4 shrink-0"/>All requirements saved successfully! These will appear during the application process.</div>}
+        {saved  && <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-xl px-4 py-3 mb-4"><CheckCircle className="w-4 h-4 shrink-0"/>Requirements saved! Documents will appear at the correct application step.</div>}
 
-        {/* ── ELIGIBILITY RULES ── */}
+        {/* ── ELIGIBILITY ── */}
         <Section icon={Shield} title="Eligibility Rules" subtitle="Minimum requirements checked automatically when a student is selected">
           <div className="grid grid-cols-2 gap-4 mt-3 mb-4">
             <FL label="Minimum Education Level">
@@ -186,7 +244,7 @@ export default function ProgramRequirements() {
             ))}
           </div>
           <div className="grid grid-cols-2 gap-4 mb-4">
-            <FL label="Commission Text" hint="Shown on program card e.g. Up to £2,800">
+            <FL label="Commission Text" hint="e.g. Up to £2,800">
               <input className={inp} value={elig.commission_text} onChange={e=>setElig(p=>({...p,commission_text:e.target.value}))} placeholder="Up to £2,800 GBP"/>
             </FL>
             <FL label="Post-Study Work Visa">
@@ -196,8 +254,8 @@ export default function ProgramRequirements() {
               </select>
             </FL>
           </div>
-          <FL label="Commission Breakdown" hint="Detailed text shown in the Commissions section of the application">
-            <textarea rows={3} className={ta} value={elig.commission_breakdown} onChange={e=>setElig(p=>({...p,commission_breakdown:e.target.value}))} placeholder="The Commission structure is based on the school's confirmation of the student's successful full-time enrolment…"/>
+          <FL label="Commission Breakdown">
+            <textarea rows={3} className={ta} value={elig.commission_breakdown} onChange={e=>setElig(p=>({...p,commission_breakdown:e.target.value}))} placeholder="Commission structure details…"/>
           </FL>
         </Section>
 
@@ -207,7 +265,7 @@ export default function ProgramRequirements() {
             {[
               ['eligibility_guideline',   'Step 1 — Eligibility',     'Text above the student selector dropdown'],
               ['intake_guideline',        'Step 3 — Intakes',         'Instructions for selecting an intake date'],
-              ['prerequisites_guideline', 'Step 4 — Prerequisites',   'Warning/instruction shown above the prerequisites list'],
+              ['prerequisites_guideline', 'Step 4 — Prerequisites',   'Warning shown above the prerequisites list'],
               ['backups_guideline',       'Step 5 — Backup Programs', 'Instructions for choosing backup programs'],
               ['documents_guideline',     'Step 6 — Documents',       'Instructions above the required documents checklist'],
             ].map(([key, label, hint]) => (
@@ -219,33 +277,29 @@ export default function ProgramRequirements() {
         </Section>
 
         {/* ── PREREQUISITES ── */}
-        <Section icon={AlertTriangle} title="Prerequisites" subtitle="Requirements shown as numbered collapsible items on Step 4 of the application" badge={prerequisites.length}>
+        <Section icon={AlertTriangle} title="Prerequisites" subtitle="Requirements shown as numbered collapsible items on Step 4" badge={prerequisites.length}>
           <div className="flex items-center justify-between mt-3 mb-4">
             <p className="text-xs text-slate-500">Use ↑↓ to reorder. Each item appears as a collapsible accordion when applying.</p>
             <button onClick={addPrereq} className="flex items-center gap-1.5 text-sm font-bold text-brand-600 hover:text-brand-800 bg-brand-50 hover:bg-brand-100 px-4 py-2 rounded-xl transition-colors border border-brand-200">
               <Plus className="w-4 h-4"/>Add Prerequisite
             </button>
           </div>
-
           {prerequisites.length === 0
-            ? <div className="border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center"><AlertTriangle className="w-10 h-10 text-slate-300 mx-auto mb-2"/><p className="text-slate-400 text-sm">No prerequisites added.</p><button onClick={addPrereq} className="mt-3 text-brand-600 text-sm font-bold hover:underline">+ Add first prerequisite</button></div>
+            ? <div className="border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center"><p className="text-slate-400 text-sm">No prerequisites added.</p><button onClick={addPrereq} className="mt-3 text-brand-600 text-sm font-bold hover:underline">+ Add first prerequisite</button></div>
             : <div className="space-y-3">
                 {prerequisites.map((prereq, idx) => (
-                  <div key={prereq.id} className="border-2 border-slate-200 hover:border-brand-200 rounded-2xl p-4 transition-colors group">
+                  <div key={prereq.id} className="border-2 border-slate-200 hover:border-brand-200 rounded-2xl p-4 transition-colors">
                     <div className="flex items-center gap-2 mb-3">
                       <div className="flex flex-col gap-0.5 shrink-0">
                         <button onClick={()=>movePrereq(idx,-1)} disabled={idx===0} className="p-0.5 hover:text-brand-600 text-slate-300 disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5"/></button>
                         <button onClick={()=>movePrereq(idx,1)} disabled={idx===prerequisites.length-1} className="p-0.5 hover:text-brand-600 text-slate-300 disabled:opacity-30"><ChevronDown className="w-3.5 h-3.5"/></button>
                       </div>
                       <div className="w-7 h-7 bg-brand-100 rounded-full flex items-center justify-center text-brand-700 font-bold text-xs shrink-0">{idx+1}</div>
-                      <input className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+                      <input className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
                         value={prereq.title} onChange={e=>upPrereq(idx,'title',e.target.value)} placeholder="Prerequisite title e.g. Country Specific GPA - Pakistan"/>
-                      <button onClick={()=>removePrereq(idx)} className="p-2 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors shrink-0">
-                        <Trash2 className="w-4 h-4"/>
-                      </button>
+                      <button onClick={()=>removePrereq(idx)} className="p-2 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors shrink-0"><Trash2 className="w-4 h-4"/></button>
                     </div>
-                    <textarea rows={3} className={ta} value={prereq.body} onChange={e=>upPrereq(idx,'body',e.target.value)}
-                      placeholder="Detailed description shown when this item is expanded during the application…"/>
+                    <textarea rows={3} className={ta} value={prereq.body} onChange={e=>upPrereq(idx,'body',e.target.value)} placeholder="Detailed description shown when this item is expanded…"/>
                   </div>
                 ))}
               </div>
@@ -253,50 +307,95 @@ export default function ProgramRequirements() {
         </Section>
 
         {/* ── REQUIRED DOCUMENTS ── */}
-        <Section icon={FileText} title="Required Documents" subtitle="Documents shown as numbered checklist on Step 6 of the application" badge={documents.length}>
-          <div className="flex items-center justify-between mt-3 mb-4">
-            <p className="text-xs text-slate-500">Use ↑↓ to reorder. "Required" items are mandatory; unchecked items are optional.</p>
+        <Section icon={FileText} title="Required Documents" subtitle="Documents assigned to specific application steps — shown & uploadable at the right time" badge={documents.length}>
+          <div className="flex items-center justify-between mt-3 mb-3">
+            <p className="text-xs text-slate-500">Assign each document to an application step. Documents only appear when the application reaches that step.</p>
             <button onClick={addDoc} className="flex items-center gap-1.5 text-sm font-bold text-brand-600 hover:text-brand-800 bg-brand-50 hover:bg-brand-100 px-4 py-2 rounded-xl transition-colors border border-brand-200">
               <Plus className="w-4 h-4"/>Add Document
             </button>
+          </div>
+
+          {/* Step legend */}
+          <div className="flex flex-wrap gap-1.5 mb-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider self-center mr-1">Steps:</span>
+            {APP_STEPS.filter(s=>s.key).map(s=>(
+              <span key={s.key} className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STEP_COLORS[s.key]}`}>{s.label}</span>
+            ))}
           </div>
 
           {documents.length === 0
             ? <div className="border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center"><FileText className="w-10 h-10 text-slate-300 mx-auto mb-2"/><p className="text-slate-400 text-sm">No documents added.</p><button onClick={addDoc} className="mt-3 text-brand-600 text-sm font-bold hover:underline">+ Add first document</button></div>
             : <div className="space-y-3">
                 {documents.map((doc, idx) => (
-                  <div key={doc.id} className="border-2 border-slate-200 hover:border-brand-200 rounded-2xl p-4 transition-colors">
-                    {/* Row 1: controls + name + type badge + required toggle + delete */}
+                  <div key={doc.id} className={`border-2 rounded-2xl p-4 transition-colors ${doc.application_step ? 'border-brand-200 bg-brand-50/30' : 'border-slate-200 hover:border-slate-300'}`}>
+                    {/* Row 1: reorder + number + name + delete */}
                     <div className="flex items-center gap-2 mb-3">
                       <div className="flex flex-col gap-0.5 shrink-0">
                         <button onClick={()=>moveDoc(idx,-1)} disabled={idx===0} className="p-0.5 hover:text-brand-600 text-slate-300 disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5"/></button>
                         <button onClick={()=>moveDoc(idx,1)} disabled={idx===documents.length-1} className="p-0.5 hover:text-brand-600 text-slate-300 disabled:opacity-30"><ChevronDown className="w-3.5 h-3.5"/></button>
                       </div>
                       <div className="w-7 h-7 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold text-xs shrink-0">{idx+1}</div>
-                      <input className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+                      <input className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
                         value={doc.name} onChange={e=>upDoc(idx,'name',e.target.value)} placeholder="Document name e.g. Copy of Education Transcripts"/>
-                      {/* Type badge dropdown */}
-                      <select className="border border-slate-200 rounded-xl text-xs px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-brand-400 bg-white text-slate-600 w-28 shrink-0"
-                        value={doc.doc_type} onChange={e=>upDoc(idx,'doc_type',e.target.value)}>
-                        <option value="">No badge</option>
-                        {DOC_TYPES.map(t=><option key={t}>{t}</option>)}
-                      </select>
-                      {/* Required toggle */}
-                      <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 cursor-pointer whitespace-nowrap shrink-0">
-                        <input type="checkbox" checked={doc.required} onChange={e=>upDoc(idx,'required',e.target.checked)} className="w-4 h-4 accent-brand-600"/>
-                        Required
-                      </label>
-                      <button onClick={()=>removeDoc(idx)} className="p-2 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors shrink-0">
-                        <Trash2 className="w-4 h-4"/>
-                      </button>
+                      <button onClick={()=>removeDoc(idx)} className="p-2 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors shrink-0"><Trash2 className="w-4 h-4"/></button>
                     </div>
-                    {/* Row 2: description */}
+                    {/* Row 2: type + step + required */}
+                    <div className="grid grid-cols-3 gap-3 mb-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Badge Type</label>
+                        <select className="w-full border border-slate-200 rounded-xl text-xs px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-brand-400 bg-white text-slate-600"
+                          value={doc.doc_type} onChange={e=>upDoc(idx,'doc_type',e.target.value)}>
+                          <option value="">No badge</option>
+                          {DOC_TYPES.map(t=><option key={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                          <Flag className="w-3 h-3"/>Application Step
+                        </label>
+                        <select
+                          className={`w-full border rounded-xl text-xs px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-brand-400 font-semibold
+                            ${doc.application_step ? `${STEP_COLORS[doc.application_step]} border-current/30` : 'border-slate-200 bg-white text-slate-600'}`}
+                          value={doc.application_step} onChange={e=>upDoc(idx,'application_step',e.target.value)}>
+                          {APP_STEPS.map(s=><option key={s.key} value={s.key}>{s.label}</option>)}
+                        </select>
+                      </div>
+                      <div className="flex items-end pb-1">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={doc.required} onChange={e=>upDoc(idx,'required',e.target.checked)} className="w-4 h-4 accent-brand-600"/>
+                          <span className="text-xs font-bold text-slate-600">Required</span>
+                        </label>
+                      </div>
+                    </div>
+                    {/* Row 3: description */}
                     <textarea rows={2} className={ta} value={doc.description} onChange={e=>upDoc(idx,'description',e.target.value)}
                       placeholder="Description shown when expanded e.g. Official transcripts from all attended institutions, certified and stamped."/>
                   </div>
                 ))}
               </div>
           }
+
+          {/* Step summary */}
+          {documents.length > 0 && (
+            <div className="mt-5 pt-4 border-t border-slate-100">
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Documents by Step</div>
+              <div className="grid grid-cols-2 gap-2">
+                {APP_STEPS.map(step => {
+                  const docs = docsByStep[step.key] || [];
+                  if (!docs.length && step.key) return null;
+                  return (
+                    <div key={step.key} className={`rounded-xl p-3 border ${step.key ? STEP_COLORS[step.key]+' border-current/20' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                      <div className="text-[10px] font-bold uppercase tracking-wider mb-1.5">{step.label}</div>
+                      {docs.length === 0
+                        ? <div className="text-[10px] opacity-60">No documents</div>
+                        : docs.map(d=><div key={d.id} className="text-xs font-semibold truncate flex items-center gap-1"><span>{d.required?'●':'○'}</span>{d.name}</div>)
+                      }
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </Section>
 
         {/* Bottom save */}
@@ -304,7 +403,7 @@ export default function ProgramRequirements() {
           <p className="text-sm text-slate-500">
             <span className="font-semibold text-slate-700">{prerequisites.length}</span> prerequisites &nbsp;·&nbsp;
             <span className="font-semibold text-slate-700">{documents.length}</span> documents &nbsp;·&nbsp;
-            <span className="font-semibold text-slate-700">{Object.values(elig).filter(Boolean).length}</span> eligibility rules set
+            <span className="font-semibold text-slate-700">{documents.filter(d=>d.application_step).length}</span> assigned to steps
           </p>
           <button onClick={handleSave} disabled={saving}
             className="flex items-center gap-2 bg-brand-700 hover:bg-brand-800 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-colors shadow-sm disabled:opacity-60">
@@ -312,7 +411,6 @@ export default function ProgramRequirements() {
             {saving ? 'Saving…' : saved ? 'Saved!' : 'Save All Requirements'}
           </button>
         </div>
-
       </div>
     </AdminLayout>
   );

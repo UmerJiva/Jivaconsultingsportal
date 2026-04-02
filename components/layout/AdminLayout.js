@@ -6,7 +6,8 @@ import {
   GraduationCap, LayoutDashboard, Users, Building2, UserCheck, MessageSquare,
   FileText, Settings, LogOut, Bell, Menu, X, ChevronDown, ChevronLeft,
   Receipt, Shield,
-  TrendingUp, ChevronRight, BookOpen, Home, Search, CheckCircle, PanelLeftClose, PanelLeftOpen
+  TrendingUp, ChevronRight, BookOpen, Home, Search, CheckCircle, PanelLeftClose, PanelLeftOpen, HelpCircle,
+  UserCog, Users2
 } from 'lucide-react';
 import { fetchUser } from '../../lib/auth';
 import { Spinner } from '../ui/index';
@@ -32,10 +33,12 @@ const NAV = {
     {
       group: 'System',
       items: [
-        { label: 'Invoices', href: '/admin/invoices', icon: Receipt    },
-        { label: 'Roles',    href: '/admin/roles',    icon: Shield     },
-        { label: 'Reports',  href: '/admin/reports',  icon: TrendingUp },
-        { label: 'Settings', href: '/admin/settings', icon: Settings   },
+        { label: 'Employees', href: '/admin/employees', icon: Users2     },
+        { label: 'Invoices',  href: '/admin/invoices',  icon: Receipt    },
+        { label: 'Roles',     href: '/admin/roles',     icon: Shield     },
+        { label: 'Reports',   href: '/admin/reports',   icon: TrendingUp },
+        { label: 'Questions', href: '/admin/questions', icon: HelpCircle },
+        { label: 'Settings',  href: '/admin/settings',  icon: Settings   },
       ],
     },
   ],
@@ -43,16 +46,18 @@ const NAV = {
     {
       group: 'Menu',
       items: [
-        { label: 'Dashboard',      href: '/agent/dashboard',    icon: LayoutDashboard },
-        { label: 'My Students',    href: '/agent/students',     icon: Users,
+        { label: 'Dashboard',       href: '/agent/dashboard',    icon: LayoutDashboard },
+        { label: 'My Students',     href: '/agent/students',     icon: Users,
           activeOn: ['/agent/students', '/agent/student'] },
-        { label: 'My Tasks',       href: '/agent/tasks',        icon: CheckCircle,
+        { label: 'My Team',         href: '/agent/team',         icon: Users2,
+          activeOn: ['/agent/team'] },
+        { label: 'My Tasks',        href: '/agent/tasks',        icon: CheckCircle,
           activeOn: ['/agent/tasks'] },
-        { label: 'Programs',       href: '/agent/universities', icon: BookOpen,
+        { label: 'Programs',        href: '/agent/universities', icon: BookOpen,
           activeOn: ['/agent/universities', '/agent/university', '/agent/program'] },
-        { label: 'Chat with Admin',href: '/agent/chat',         icon: MessageSquare,
+        { label: 'Chat with Admin', href: '/agent/chat',         icon: MessageSquare,
           activeOn: ['/agent/chat'] },
-        { label: 'Applications',   href: '/agent/applications', icon: FileText,
+        { label: 'Applications',    href: '/agent/applications', icon: FileText,
           activeOn: ['/agent/applications'] },
       ],
     },
@@ -69,24 +74,67 @@ const NAV = {
       ],
     },
   ],
+
+  // ── Admin Employee — only sees their assigned agent's world ──
+  admin_employee: [
+    {
+      group: 'Menu',
+      items: [
+        { label: 'Dashboard',    href: '/admin-employee/dashboard',    icon: LayoutDashboard },
+        { label: 'My Agent',     href: '/admin-employee/agent',        icon: UserCheck       },
+        { label: 'Students',     href: '/admin-employee/students',     icon: Users,
+          activeOn: ['/admin-employee/students', '/admin-employee/student'] },
+        { label: 'Applications', href: '/admin-employee/applications', icon: FileText,
+          activeOn: ['/admin-employee/applications'] },
+        { label: 'Tasks',        href: '/admin-employee/tasks',        icon: CheckCircle,
+          activeOn: ['/admin-employee/tasks'] },
+        { label: 'Chat',         href: '/admin-employee/chat',         icon: MessageSquare,
+          activeOn: ['/admin-employee/chat'] },
+      ],
+    },
+  ],
+
+  // ── Agent Employee — only sees their assigned students ──
+  // ── Agent Employee — uses SAME pages as agent, permissions control access ──
+agent_employee: [
+  {
+    group: 'Menu',
+    items: [
+      { label: 'Dashboard',       href: '/agent/dashboard',    icon: LayoutDashboard },
+      { label: 'My Students',     href: '/agent/students',     icon: Users,
+        activeOn: ['/agent/students', '/agent/student'] },
+      { label: 'Applications',    href: '/agent/applications', icon: FileText,
+        activeOn: ['/agent/applications'] },
+      { label: 'Programs',        href: '/agent/universities', icon: BookOpen,
+        activeOn: ['/agent/universities', '/agent/university', '/agent/program'] },
+      { label: 'Chat with Agent', href: '/agent/chat',         icon: MessageSquare,
+        activeOn: ['/agent/chat'] },
+    ],
+  },
+],
 };
 
 const ROLE_CONFIG = {
-  admin:   { label: 'Administrator', dot: 'bg-emerald-400', badge: 'bg-emerald-100 text-emerald-700' },
-  agent:   { label: 'Agent',         dot: 'bg-amber-400',   badge: 'bg-amber-100 text-amber-700'     },
-  student: { label: 'Student',       dot: 'bg-sky-400',     badge: 'bg-sky-100 text-sky-700'         },
-  custom:  { label: 'Staff',         dot: 'bg-violet-400',  badge: 'bg-violet-100 text-violet-700'   },
+  admin:          { label: 'Administrator',   dot: 'bg-emerald-400', badge: 'bg-emerald-100 text-emerald-700' },
+  agent:          { label: 'Agent',           dot: 'bg-amber-400',   badge: 'bg-amber-100 text-amber-700'     },
+  student:        { label: 'Student',         dot: 'bg-sky-400',     badge: 'bg-sky-100 text-sky-700'         },
+  custom:         { label: 'Staff',           dot: 'bg-violet-400',  badge: 'bg-violet-100 text-violet-700'   },
+  admin_employee: { label: 'Admin Employee',  dot: 'bg-blue-400',    badge: 'bg-blue-100 text-blue-700'       },
+  agent_employee: { label: 'Agent Employee',  dot: 'bg-teal-400',    badge: 'bg-teal-100 text-teal-700'       },
 };
+
+// Roles that are allowed to use this layout
+const ALLOWED_ROLES = ['admin', 'agent', 'student', 'custom', 'admin_employee', 'agent_employee'];
 
 export default function AdminLayout({ children, title = 'Dashboard' }) {
   const router  = useRouter();
   const dropRef = useRef(null);
 
-  const [user, setUser]           = useState(null);
+  const [user, setUser]               = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [dropOpen, setDropOpen]   = useState(false);
+  const [collapsed, setCollapsed]     = useState(false);
+  const [mobileOpen, setMobileOpen]   = useState(false);
+  const [dropOpen, setDropOpen]       = useState(false);
   const [portalSettings, setPortalSettings] = useState({
     portal_name: 'EduPortal',
     portal_tagline: 'Management System',
@@ -94,9 +142,10 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
 
   useEffect(() => {
     fetchUser().then(u => {
-      if (!u) { router.replace('/login'); return; }
-      // All roles are allowed through — each page handles its own access.
-      // Only redirect if completely unauthenticated.
+      if (!u || !ALLOWED_ROLES.includes(u.role)) {
+        router.replace('/login');
+        return;
+      }
       setUser(u);
       setAuthLoading(false);
     });
@@ -138,31 +187,64 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
     );
   }
 
+  // ── Build nav groups ──────────────────────────────────────────
   const navGroups = (() => {
     if (user?.role === 'custom') {
-      // Build nav from permissions
+      // Build nav dynamically from permissions
       const perms = user.permissions || {};
       const ALL_ITEMS = [
-        { label:'Dashboard',    href:'/admin/dashboard',    icon:LayoutDashboard, module:'dashboard'   },
-        { label:'Students',     href:'/admin/students',     icon:Users,           module:'students', activeOn:['/admin/students','/admin/student']  },
-        { label:'Universities', href:'/admin/universities', icon:Building2,       module:'universities', activeOn:['/admin/universities','/admin/university'] },
-        { label:'Programs',     href:'/admin/programs',     icon:BookOpen,        module:'programs', activeOn:['/admin/programs','/admin/program'] },
-        { label:'Agents',       href:'/admin/agents',       icon:UserCheck,       module:'agents', activeOn:['/admin/agents','/admin/agent'] },
-        { label:'Applications', href:'/admin/applications', icon:FileText,        module:'applications', activeOn:['/admin/applications','/admin/application'] },
-        { label:'Invoices',     href:'/admin/invoices',     icon:Receipt,         module:'invoices' },
-        { label:'Reports',      href:'/admin/reports',      icon:TrendingUp,      module:'reports'  },
-        { label:'Settings',     href:'/admin/settings',     icon:Settings,        module:'settings' },
-        { label:'Roles',        href:'/admin/roles',        icon:Shield,          module:'roles'    },
+        { label: 'Dashboard',     href: '/admin/dashboard',    icon: LayoutDashboard, module: 'dashboard'    },
+        { label: 'Students',      href: '/admin/students',     icon: Users,           module: 'students',     activeOn: ['/admin/students', '/admin/student']       },
+        { label: 'Universities',  href: '/admin/universities', icon: Building2,       module: 'universities', activeOn: ['/admin/universities', '/admin/university'] },
+        { label: 'Search & Apply',href: '/admin/programs',     icon: BookOpen,        module: 'programs',     activeOn: ['/admin/programs', '/admin/program']        },
+        { label: 'Agents',        href: '/admin/agents',       icon: UserCheck,       module: 'agents',       activeOn: ['/admin/agents', '/admin/agent']            },
+        { label: 'Applications',  href: '/admin/applications', icon: FileText,        module: 'applications', activeOn: ['/admin/applications', '/admin/application'] },
+        { label: 'Invoices',      href: '/admin/invoices',     icon: Receipt,         module: 'invoices'  },
+        { label: 'Reports',       href: '/admin/reports',      icon: TrendingUp,      module: 'reports'   },
+        { label: 'Settings',      href: '/admin/settings',     icon: Settings,        module: 'settings'  },
+        { label: 'Questions',     href: '/admin/questions',    icon: HelpCircle,      module: 'questions' },
+        { label: 'Roles',         href: '/admin/roles',        icon: Shield,          module: 'roles'     },
       ];
       const allowed = ALL_ITEMS.filter(item =>
-        item.module === 'dashboard' || (perms[item.module]||[]).includes('view')
+        item.module === 'dashboard' || (perms[item.module] || []).includes('view')
       );
-      return allowed.length ? [{ group:'Menu', items:allowed }] : [{ group:'Menu', items:[{ label:'Dashboard', href:'/admin/dashboard', icon:LayoutDashboard }] }];
+      return allowed.length
+        ? [{ group: 'Menu', items: allowed }]
+        : [{ group: 'Menu', items: [{ label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard }] }];
     }
+
+    // admin_employee: optionally add Universities / Programs based on permissions
+    if (user?.role === 'admin_employee') {
+      const base = NAV.admin_employee[0].items;
+      const extra = [];
+      if (user?.permissions?.canAddUniversities)
+        extra.push({ label: 'Universities', href: '/admin-employee/universities', icon: Building2 });
+      if (user?.permissions?.canAddPrograms)
+        extra.push({ label: 'Programs', href: '/admin-employee/programs', icon: BookOpen });
+      return [{ group: 'Menu', items: [...base, ...extra] }];
+    }
+
     return NAV[user?.role] || [];
   })();
-  const roleCfg = ROLE_CONFIG[user?.role] || ROLE_CONFIG.student;
-  const initials  = (user?.name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+
+  const roleCfg  = ROLE_CONFIG[user?.role] || ROLE_CONFIG.student;
+  const initials = (user?.name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+
+  // Role label shown in topbar & dropdown
+  function getRoleLabel() {
+    if (user?.role === 'custom')          return user?.customRoleName || 'Staff';
+    if (user?.role === 'admin_employee')  return user?.designation   || 'Admin Employee';
+    if (user?.role === 'agent_employee')  return user?.designation   || 'Agent Employee';
+    return user?.role;
+  }
+
+  // Home dashboard path per role
+  function getDashboardPath() {
+  if (user?.role === 'custom')          return '/admin/dashboard';
+  if (user?.role === 'admin_employee')  return '/admin/dashboard';
+  if (user?.role === 'agent_employee')  return '/agent/dashboard';
+  return `/${user?.role}/dashboard`;
+}
 
   // ── Sidebar inner ─────────────────────────────────────────────
   function SidebarContent({ isMobile = false }) {
@@ -176,8 +258,12 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
           </div>
           {(!collapsed || isMobile) && (
             <div className="flex-1 min-w-0">
-              <div className="font-bold text-slate-800 text-base leading-tight" style={{ fontFamily: 'Georgia,serif' }}>{portalSettings.portal_name || 'EduPortal'}</div>
-              <div className="text-slate-400 text-[10px] font-medium tracking-wide">{portalSettings.portal_tagline || 'Management System'}</div>
+              <div className="font-bold text-slate-800 text-base leading-tight" style={{ fontFamily: 'Georgia,serif' }}>
+                {portalSettings.portal_name || 'EduPortal'}
+              </div>
+              <div className="text-slate-400 text-[10px] font-medium tracking-wide">
+                {portalSettings.portal_tagline || 'Management System'}
+              </div>
             </div>
           )}
           {isMobile && (
@@ -202,6 +288,22 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
                 </div>
               </div>
             </div>
+
+            {/* Show assigned agent for admin_employee */}
+            {user?.role === 'admin_employee' && user?.agentName && (
+              <div className="mt-2 flex items-center gap-1.5 bg-blue-50 border border-blue-100 rounded-lg px-3 py-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"/>
+                <span className="text-[10px] text-blue-700 truncate font-medium">Agent: {user.agentName}</span>
+              </div>
+            )}
+
+            {/* Show agent name for agent_employee */}
+            {user?.role === 'agent_employee' && user?.agentName && (
+              <div className="mt-2 flex items-center gap-1.5 bg-teal-50 border border-teal-100 rounded-lg px-3 py-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0"/>
+                <span className="text-[10px] text-teal-700 truncate font-medium">Under: {user.agentName}</span>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex justify-center py-3 border-b border-slate-100">
@@ -286,7 +388,7 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
         )}
 
         {/* Logout */}
-        <div className={`border-t border-slate-100 p-3`}>
+        <div className="border-t border-slate-100 p-3">
           <button onClick={handleLogout}
             className={`
               w-full flex items-center rounded-xl py-2.5 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-all text-sm font-medium group
@@ -335,7 +437,7 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
             <Menu className="w-5 h-5" />
           </button>
 
-          {/* Desktop collapse toggle in topbar (alternative) */}
+          {/* Desktop collapse toggle in topbar */}
           <button className="hidden lg:flex p-2 rounded-xl hover:bg-slate-100 text-slate-500 transition-colors"
             onClick={() => setCollapsed(c => !c)}>
             {collapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
@@ -343,7 +445,7 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
 
           {/* Page title breadcrumb */}
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-slate-400 text-xs capitalize hidden sm:block">{user?.role === 'custom' ? (user?.customRoleName||'Staff') : user?.role}</span>
+            <span className="text-slate-400 text-xs capitalize hidden sm:block">{getRoleLabel()}</span>
             <ChevronRight className="w-3.5 h-3.5 text-slate-300 hidden sm:block" />
             <h1 className="font-bold text-slate-800">{title}</h1>
           </div>
@@ -367,7 +469,7 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
                 </div>
                 <div className="hidden sm:block text-left">
                   <div className="text-sm font-bold text-slate-800 leading-tight">{user?.name?.split(' ')[0]}</div>
-                  <div className="text-[10px] text-slate-400 capitalize leading-tight">{user?.role === 'custom' ? (user?.customRoleName||'Staff') : user?.role}</div>
+                  <div className="text-[10px] text-slate-400 capitalize leading-tight">{getRoleLabel()}</div>
                 </div>
                 <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${dropOpen ? 'rotate-180' : ''}`} />
               </button>
@@ -390,8 +492,9 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
                       </div>
                     </div>
                   </div>
+
                   {/* Links */}
-                  <Link href={user?.role === 'custom' ? '/admin/dashboard' : `/${user?.role}/dashboard`} onClick={() => setDropOpen(false)}
+                  <Link href={getDashboardPath()} onClick={() => setDropOpen(false)}
                     className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-emerald-700 transition-colors font-medium">
                     <Home className="w-4 h-4" />Dashboard
                   </Link>

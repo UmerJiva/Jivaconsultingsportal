@@ -1,4 +1,4 @@
-// pages/admin/agents.js — Professional redesign
+// pages/admin/agents.js
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from '../../components/layout/AdminLayout';
@@ -11,6 +11,7 @@ import {
   MoreHorizontal, Globe, Shield
 } from 'lucide-react';
 import { apiCall } from '../../lib/useApi';
+import useAdminPermissions, { AccessDenied } from '../../lib/useAdminPermissions';
 
 const TIER_CFG = {
   Platinum: { label:'💎 Platinum', bg:'bg-sky-100',    text:'text-sky-800'    },
@@ -86,7 +87,6 @@ function AgentModal({ open, editing, onClose, onSaved, countries }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}/>
       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-xl flex flex-col max-h-[90vh]" onClick={e=>e.stopPropagation()}>
-        {/* Modal header */}
         <div className="flex items-center justify-between px-7 py-5 border-b border-slate-100 shrink-0">
           <div>
             <h2 className="text-lg font-bold text-slate-900">{editing ? 'Edit Agent' : 'Add New Agent'}</h2>
@@ -159,7 +159,7 @@ function AgentModal({ open, editing, onClose, onSaved, countries }) {
 }
 
 // ── Agent Card ────────────────────────────────────────────────
-function AgentCard({ agent, index, onEdit, onDelete, onClick }) {
+function AgentCard({ agent, index, onEdit, onDelete, onClick, canEdit, canDelete }) {
   const initials  = (agent.name||'?').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
   const gradient  = AVATAR_GRADIENTS[index % AVATAR_GRADIENTS.length];
   const statusCfg = STATUS_CFG[agent.status] || STATUS_CFG.Pending;
@@ -171,62 +171,38 @@ function AgentCard({ agent, index, onEdit, onDelete, onClick }) {
       className="bg-white rounded-3xl border border-slate-200 hover:border-emerald-300 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group cursor-pointer flex flex-col"
       onClick={onClick}>
 
-      {/* Top accent bar */}
       <div className={`h-1.5 w-full bg-gradient-to-r ${gradient}`}/>
 
       <div className="p-6 flex-1 flex flex-col">
-        {/* Header row — avatar + badges */}
         <div className="flex items-start justify-between mb-4">
-          {/* Avatar */}
           <div className={`w-14 h-14 bg-gradient-to-br ${gradient} rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-black/10 shrink-0`}>
             {initials}
           </div>
-
-          {/* Right badges */}
           <div className="flex flex-col items-end gap-1.5">
             <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full border ${statusCfg.badge}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot}`}/>
-              {agent.status}
+              <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot}`}/>{agent.status}
             </span>
             {tierCfg && (
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${tierCfg.bg} ${tierCfg.text}`}>
-                {tierCfg.label}
-              </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${tierCfg.bg} ${tierCfg.text}`}>{tierCfg.label}</span>
             )}
           </div>
         </div>
 
-        {/* Name + company */}
         <div className="mb-4">
           <h3 className="font-bold text-slate-900 text-base leading-tight mb-0.5">{agent.name}</h3>
           {agent.company_name && (
-            <p className="text-xs text-slate-400 flex items-center gap-1.5">
-              <Building2 className="w-3 h-3 shrink-0"/>{agent.company_name}
-            </p>
+            <p className="text-xs text-slate-400 flex items-center gap-1.5"><Building2 className="w-3 h-3 shrink-0"/>{agent.company_name}</p>
           )}
         </div>
 
-        {/* Contact info */}
         <div className="space-y-2 mb-5">
-          <div className="flex items-center gap-2.5 text-xs text-slate-500">
-            <Mail className="w-3.5 h-3.5 text-slate-300 shrink-0"/>
-            <span className="truncate">{agent.email}</span>
-          </div>
-          {agent.phone && (
-            <div className="flex items-center gap-2.5 text-xs text-slate-500">
-              <Phone className="w-3.5 h-3.5 text-slate-300 shrink-0"/>
-              <span>{agent.phone}</span>
-            </div>
-          )}
+          <div className="flex items-center gap-2.5 text-xs text-slate-500"><Mail className="w-3.5 h-3.5 text-slate-300 shrink-0"/><span className="truncate">{agent.email}</span></div>
+          {agent.phone && <div className="flex items-center gap-2.5 text-xs text-slate-500"><Phone className="w-3.5 h-3.5 text-slate-300 shrink-0"/><span>{agent.phone}</span></div>}
           {(agent.city || agent.country) && (
-            <div className="flex items-center gap-2.5 text-xs text-slate-500">
-              <MapPin className="w-3.5 h-3.5 text-slate-300 shrink-0"/>
-              <span>{[agent.city, agent.country].filter(Boolean).join(', ')} {agent.flag}</span>
-            </div>
+            <div className="flex items-center gap-2.5 text-xs text-slate-500"><MapPin className="w-3.5 h-3.5 text-slate-300 shrink-0"/><span>{[agent.city, agent.country].filter(Boolean).join(', ')} {agent.flag}</span></div>
           )}
         </div>
 
-        {/* Stats grid */}
         <div className="grid grid-cols-3 gap-2 mb-5 mt-auto">
           <div className="bg-slate-50 rounded-2xl p-3 text-center">
             <div className="text-lg font-bold text-slate-800 leading-none mb-1">{agent.total_students||0}</div>
@@ -242,20 +218,25 @@ function AgentCard({ agent, index, onEdit, onDelete, onClick }) {
           </div>
         </div>
 
-        {/* Actions */}
         <div className="flex gap-2" onClick={e=>e.stopPropagation()}>
           <button onClick={onClick}
             className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors shadow-sm shadow-emerald-200">
             <Eye className="w-3.5 h-3.5"/>View Profile
           </button>
-          <button onClick={e=>{e.stopPropagation();onEdit(agent);}}
-            className="w-10 flex items-center justify-center rounded-2xl border border-slate-200 hover:border-amber-300 hover:bg-amber-50 text-slate-400 hover:text-amber-600 transition-all">
-            <Pencil className="w-3.5 h-3.5"/>
-          </button>
-          <button onClick={e=>{e.stopPropagation();onDelete(agent);}}
-            className="w-10 flex items-center justify-center rounded-2xl border border-slate-200 hover:border-red-300 hover:bg-red-50 text-slate-400 hover:text-red-500 transition-all">
-            <Trash2 className="w-3.5 h-3.5"/>
-          </button>
+          {/* ── PERMISSION GATE: Edit button ── */}
+          {canEdit && (
+            <button onClick={e=>{e.stopPropagation();onEdit(agent);}}
+              className="w-10 flex items-center justify-center rounded-2xl border border-slate-200 hover:border-amber-300 hover:bg-amber-50 text-slate-400 hover:text-amber-600 transition-all">
+              <Pencil className="w-3.5 h-3.5"/>
+            </button>
+          )}
+          {/* ── PERMISSION GATE: Delete button ── */}
+          {canDelete && (
+            <button onClick={e=>{e.stopPropagation();onDelete(agent);}}
+              className="w-10 flex items-center justify-center rounded-2xl border border-slate-200 hover:border-red-300 hover:bg-red-50 text-slate-400 hover:text-red-500 transition-all">
+              <Trash2 className="w-3.5 h-3.5"/>
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -265,6 +246,10 @@ function AgentCard({ agent, index, onEdit, onDelete, onClick }) {
 // ── Main Page ─────────────────────────────────────────────────
 export default function AgentsPage() {
   const router = useRouter();
+
+  // ── PERMISSIONS ──────────────────────────────────────────────
+  const { can, isRestricted, loading: permLoading } = useAdminPermissions();
+
   const [agents, setAgents]   = useState([]);
   const [total, setTotal]     = useState(0);
   const [pages, setPages]     = useState(1);
@@ -276,6 +261,15 @@ export default function AgentsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing]   = useState(null);
   const LIMIT = 12;
+
+  // Block page if no view access
+  if (!permLoading && isRestricted && !can('agents', 'view')) {
+    return (
+      <AdminLayout title="Agents">
+        <AccessDenied message="You don't have permission to view agents." />
+      </AdminLayout>
+    );
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -297,15 +291,14 @@ export default function AgentsPage() {
     load();
   }
 
-  // Derived stats from current page
-  const activeCount  = agents.filter(a=>a.status==='Active').length;
-  const totalStudents= agents.reduce((s,a)=>s+Number(a.total_students||0),0);
-  const totalCommission = agents.reduce((s,a)=>s+Number(a.commission_total||0),0);
+  const activeCount      = agents.filter(a=>a.status==='Active').length;
+  const totalStudents    = agents.reduce((s,a)=>s+Number(a.total_students||0),0);
+  const totalCommission  = agents.reduce((s,a)=>s+Number(a.commission_total||0),0);
 
   return (
     <AdminLayout title="Agents">
 
-      {/* ── Page header ── */}
+      {/* Page header */}
       <div className="flex items-start justify-between mb-7">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Agents</h2>
@@ -314,14 +307,12 @@ export default function AgentsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2.5">
-          {/* Search */}
           <div className="relative">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
             <input value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}}
               placeholder="Search agents…"
               className="pl-10 pr-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white w-56 font-medium placeholder-slate-300 transition-all focus:w-72 shadow-sm"/>
           </div>
-          {/* Status */}
           <div className="relative">
             <select value={statusFilter} onChange={e=>{setStatus(e.target.value);setPage(1);}}
               className="appearance-none pl-4 pr-9 py-2.5 border border-slate-200 rounded-2xl text-sm bg-white text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm cursor-pointer">
@@ -330,19 +321,20 @@ export default function AgentsPage() {
             </select>
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none"/>
           </div>
-          {/* Refresh */}
           <button onClick={load} className="p-2.5 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 transition-colors shadow-sm">
             <RefreshCw className="w-4 h-4"/>
           </button>
-          {/* Add agent */}
-          <button onClick={()=>{ setEditing(null); setShowModal(true); }}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-2xl text-sm transition-colors shadow-md shadow-emerald-200">
-            <UserPlus className="w-4 h-4"/>Add Agent
-          </button>
+          {/* ── PERMISSION GATE: Add Agent button ── */}
+          {can('agents', 'create') && (
+            <button onClick={()=>{ setEditing(null); setShowModal(true); }}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-2xl text-sm transition-colors shadow-md shadow-emerald-200">
+              <UserPlus className="w-4 h-4"/>Add Agent
+            </button>
+          )}
         </div>
       </div>
 
-      {/* ── Summary stat cards ── */}
+      {/* Summary stat cards */}
       <div className="grid grid-cols-4 gap-4 mb-7">
         {[
           { icon:Users,      label:'Total Agents',     value:total,            sub:'Registered',        bg:'bg-brand-600',   shade:'bg-brand-50',   text:'text-brand-700'   },
@@ -362,7 +354,7 @@ export default function AgentsPage() {
         ))}
       </div>
 
-      {/* ── Agent grid ── */}
+      {/* Agent grid */}
       {loading ? (
         <div className="flex justify-center py-28"><Spinner size="lg"/></div>
       ) : agents.length === 0 ? (
@@ -372,7 +364,7 @@ export default function AgentsPage() {
           </div>
           <h3 className="text-lg font-bold text-slate-700 mb-1">No agents found</h3>
           <p className="text-slate-400 text-sm mb-5">{search ? 'Try a different search term' : 'Add your first agent to get started'}</p>
-          {!search && (
+          {!search && can('agents', 'create') && (
             <button onClick={()=>setShowModal(true)}
               className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-2xl text-sm transition-colors">
               <UserPlus className="w-4 h-4"/>Add First Agent
@@ -389,12 +381,14 @@ export default function AgentsPage() {
               onClick={() => router.push(`/admin/agent/${agent.id}`)}
               onEdit={a => { setEditing(a); setShowModal(true); }}
               onDelete={handleDelete}
+              canEdit={can('agents', 'edit')}
+              canDelete={can('agents', 'delete')}
             />
           ))}
         </div>
       )}
 
-      {/* ── Pagination ── */}
+      {/* Pagination */}
       {!loading && pages > 1 && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-slate-500 font-medium">
@@ -409,8 +403,7 @@ export default function AgentsPage() {
               const p = Math.max(1,Math.min(pages-4,page-2))+i;
               return (
                 <button key={p} onClick={()=>setPage(p)}
-                  className={`w-10 h-10 rounded-2xl border text-sm font-bold transition-all shadow-sm
-                    ${p===page ? 'bg-emerald-600 text-white border-emerald-600' : 'border-slate-200 hover:bg-slate-50 bg-white text-slate-700'}`}>
+                  className={`w-10 h-10 rounded-2xl border text-sm font-bold transition-all shadow-sm ${p===page ? 'bg-emerald-600 text-white border-emerald-600' : 'border-slate-200 hover:bg-slate-50 bg-white text-slate-700'}`}>
                   {p}
                 </button>
               );

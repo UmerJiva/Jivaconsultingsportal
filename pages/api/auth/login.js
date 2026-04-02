@@ -34,12 +34,32 @@ export default async function handler(req, res) {
 
     // Role-specific sub-table id
     let roleId = null;
+
     if (user.role === 'agent') {
       const agent = await queryOne('SELECT id FROM agents WHERE user_id = ?', [user.id]);
       roleId = agent?.id || null;
+
     } else if (user.role === 'student') {
       const student = await queryOne('SELECT id FROM students WHERE user_id = ?', [user.id]);
       roleId = student?.id || null;
+
+    } else if (user.role === 'admin_employee') {
+      // Must have an active record in admin_employees
+      const emp = await queryOne(
+        'SELECT id FROM admin_employees WHERE user_id = ? AND is_active = 1',
+        [user.id]
+      );
+      if (!emp) return res.status(401).json({ error: 'Account deactivated' });
+      roleId = emp.id;
+
+    } else if (user.role === 'agent_employee') {
+      // Must have an active record in agent_employees
+      const emp = await queryOne(
+        'SELECT id FROM agent_employees WHERE user_id = ? AND is_active = 1',
+        [user.id]
+      );
+      if (!emp) return res.status(401).json({ error: 'Account deactivated' });
+      roleId = emp.id;
     }
 
     // Permissions for custom role users

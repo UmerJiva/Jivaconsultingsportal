@@ -1,6 +1,6 @@
 // pages/admin/students.js
 import { useRouter } from 'next/router';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import AdminLayout from '../../components/layout/AdminLayout';
 import { StatusBadge, Avatar, Spinner, EmptyState } from '../../components/ui/index';
 import {
@@ -10,6 +10,7 @@ import {
   CheckCircle, AlertTriangle, X, Upload, Info
 } from 'lucide-react';
 import { apiCall } from '../../lib/useApi';
+import useAdminPermissions, { AccessDenied } from '../../lib/useAdminPermissions';
 
 // ── Helpers ───────────────────────────────────────────────────
 const APP_COLORS = ['','bg-amber-400','bg-blue-500','bg-emerald-500','bg-purple-500','bg-red-400'];
@@ -66,101 +67,155 @@ function FL({ label, required, hint, children }) {
 
 // ── Add Student Modal ─────────────────────────────────────────
 function AddStudentModal({ open, onClose, onSaved, countries: countryList, agents }) {
-  const EMPTY = { first_name:'',middle_name:'',last_name:'',date_of_birth:'',country_id:'',passport_no:'',passport_expiry:'',gender:'',email:'',phone:'',status:'',referral_source:'',country_of_interest:'',services_of_interest:[],lead_status:'New',recruiter_type:'Owner',education_level:'',agent_id:'',notes:'',consent:false };
-  const [form, setForm] = useState(EMPTY);
-  const [saving, setSaving] = useState(false);
-  const [error, setError]   = useState('');
+  const EMPTY = {
+    first_name:'', middle_name:'', last_name:'', date_of_birth:'', country_id:'',
+    passport_no:'', passport_expiry:'', gender:'',
+    email:'', phone:'',
+    different_name:'no', alt_first_name:'', alt_middle_name:'', alt_last_name:'',
+    refused_visa:'', study_permit:'', background_details:'',
+    language_status:'has_proof',
+    english_exam_type:'',
+    ielts_score:'', ielts_date:'', ielts_l:'', ielts_r:'', ielts_w:'', ielts_s:'',
+    toefl_score:'', pte_score:'', duolingo_score:'',
+    open_to_esl: false,
+    has_gre: false,
+    gre_date:'', gre_v_score:'', gre_v_rank:'', gre_q_score:'', gre_q_rank:'', gre_w_score:'', gre_w_rank:'',
+    has_gmat: false,
+    gmat_date:'', gmat_v_score:'', gmat_v_rank:'', gmat_q_score:'', gmat_q_rank:'', gmat_w_score:'', gmat_w_rank:'', gmat_total_score:'', gmat_total_rank:'',
+    referral_source:'', country_of_interest:'', services_of_interest:[], lead_status:'New',
+    recruiter_type:'Owner', education_level:'', agent_id:'', notes:'',
+    consent: false,
+  };
 
-  useEffect(() => { if (open) { setForm(EMPTY); setError(''); } }, [open]);
+  const [form, setForm]       = useState(EMPTY);
+  const [saving, setSaving]   = useState(false);
+  const [error, setError]     = useState('');
+  const [scanning, setScanning] = useState(false);
+  const [passportFile, setPassportFile] = useState(null);
+  const passportRef = useRef(null);
+  const nameProofRef = useRef(null);
 
-  function f(k,v) { setForm(p=>({...p,[k]:v})); }
+  useEffect(() => { if (open) { setForm(EMPTY); setError(''); setPassportFile(null); } }, [open]);
+
+  function f(k, v) { setForm(p => ({ ...p, [k]: v })); }
   function toggleService(s) {
-    setForm(p => ({ ...p, services_of_interest: p.services_of_interest.includes(s) ? p.services_of_interest.filter(x=>x!==s) : [...p.services_of_interest, s] }));
+    setForm(p => ({
+      ...p,
+      services_of_interest: p.services_of_interest.includes(s)
+        ? p.services_of_interest.filter(x => x !== s)
+        : [...p.services_of_interest, s]
+    }));
+  }
+
+  async function handlePassportScan(file) {
+    if (!file) return;
+    setPassportFile(file); setScanning(true); setError('');
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64 = e.target.result.split(',')[1];
+        const mimeType = file.type || 'image/jpeg';
+        try {
+          const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: 1000,
+              messages: [{
+                role: 'user',
+                content: [
+                  { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
+                  { type: 'text', text: 'Extract passport information from this image. Return ONLY a JSON object with these exact keys: first_name, middle_name, last_name, date_of_birth (YYYY-MM-DD format), passport_no, passport_expiry (YYYY-MM-DD format), gender (Male or Female), nationality. If a field is not visible return empty string. Return only raw JSON, no markdown.' }
+                ]
+              }]
+            })
+          });
+          const data = await response.json();
+          const text = data.content?.[0]?.text || '';
+          const clean = text.replace(/```json|```/g,'').trim();
+          const parsed = JSON.parse(clean);
+          const matchedCountry = countryList.find(c =>
+            c.name.toLowerCase().includes((parsed.nationality||'').toLowerCase()) ||
+            (parsed.nationality||'').toLowerCase().includes(c.name.toLowerCase())
+          );
+          setForm(p => ({
+            ...p,
+            first_name: parsed.first_name||p.first_name, middle_name: parsed.middle_name||p.middle_name,
+            last_name: parsed.last_name||p.last_name, date_of_birth: parsed.date_of_birth||p.date_of_birth,
+            passport_no: parsed.passport_no||p.passport_no, passport_expiry: parsed.passport_expiry||p.passport_expiry,
+            gender: parsed.gender||p.gender, country_id: matchedCountry?.id||p.country_id,
+          }));
+        } catch(err) { setError('Could not read passport. Please fill details manually.'); }
+        setScanning(false);
+      };
+      reader.readAsDataURL(file);
+    } catch { setError('Failed to scan passport.'); setScanning(false); }
   }
 
   async function handleSubmit() {
-    if (!form.first_name || !form.last_name || !form.email || !form.country_id) { setError('First name, last name, email and country of citizenship are required.'); return; }
+    if (!form.first_name || !form.last_name || !form.email || !form.country_id) {
+      setError('First name, last name, email and country of citizenship are required.'); return;
+    }
     if (!form.consent) { setError('Please confirm student consent before adding.'); return; }
     setSaving(true); setError('');
     try {
       const payload = { ...form, services_of_interest: form.services_of_interest.join(','), password: 'Student@123' };
       delete payload.consent;
-      await apiCall('/api/students','POST',payload);
-      onSaved();
-      onClose();
+      await apiCall('/api/students', 'POST', payload);
+      onSaved(); onClose();
     } catch(e) { setError(e.message); }
     finally { setSaving(false); }
   }
 
   if (!open) return null;
 
+  const showEnglishExamFields = form.language_status === 'has_proof';
+  const showEslNote = form.language_status === 'no_test_delayed';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-end">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white h-full w-full max-w-lg flex flex-col shadow-2xl">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
           <h2 className="text-lg font-bold text-slate-800">Add new student</h2>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
-            <X className="w-5 h-5" />
-          </button>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"><X className="w-5 h-5" /></button>
         </div>
-
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
-
-          {/* Info banner */}
-          <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-            <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-            <p className="text-sm text-blue-700">Did you know you can also bulk import students. <a href="#" className="underline font-semibold">Learn how here</a>.</p>
-          </div>
-
-          {/* Error */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-7">
           {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3">{error}</div>}
-
-          {/* ── Personal Information ── */}
           <div>
             <h3 className="text-base font-bold text-slate-800 mb-4">Personal information</h3>
-
-            {/* Autofill button */}
-            <button className="flex items-center gap-2 border-2 border-brand-400 text-brand-600 font-semibold px-4 py-2 rounded-xl text-sm hover:bg-brand-50 transition-colors mb-2">
-              <Upload className="w-4 h-4" /> Autofill with passport
-            </button>
-            <p className="text-xs text-slate-400 mb-5">Auto-complete this section by uploading the student's passport. This is optional, but strongly recommended.</p>
-
+            <div className="border-2 border-dashed border-slate-200 rounded-2xl p-4 mb-5 text-center hover:border-brand-300 transition-colors">
+              <input ref={passportRef} type="file" className="hidden" accept="image/*,.pdf" onChange={e => handlePassportScan(e.target.files[0])} />
+              {scanning ? (
+                <div className="flex flex-col items-center gap-2 py-2"><div className="w-6 h-6 border-2 border-brand-600/30 border-t-brand-600 rounded-full animate-spin"/><p className="text-sm text-brand-600 font-semibold">Reading passport…</p></div>
+              ) : passportFile ? (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-emerald-700 font-semibold"><CheckCircle className="w-4 h-4 text-emerald-500"/>{passportFile.name} — details auto-filled</div>
+                  <button onClick={() => passportRef.current?.click()} className="text-xs text-brand-600 font-bold hover:underline">Change</button>
+                </div>
+              ) : (
+                <button onClick={() => passportRef.current?.click()} className="flex items-center gap-2 mx-auto border-2 border-brand-400 text-brand-600 font-semibold px-4 py-2 rounded-xl text-sm hover:bg-brand-50 transition-colors">
+                  <Upload className="w-4 h-4" /> Autofill with passport
+                </button>
+              )}
+              {!passportFile && !scanning && <p className="text-xs text-slate-400 mt-2">Auto-complete this section by uploading the student's passport image or scan. Optional but recommended.</p>}
+            </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <FL label="First name" required>
-                  <input className={inp} placeholder="First name" value={form.first_name} onChange={e=>f('first_name',e.target.value)} />
-                </FL>
-                <FL label="Last name" required>
-                  <input className={inp} placeholder="Last name" value={form.last_name} onChange={e=>f('last_name',e.target.value)} />
-                </FL>
+                <FL label="First name" required><input className={inp} placeholder="First name" value={form.first_name} onChange={e=>f('first_name',e.target.value)} /></FL>
+                <FL label="Last name" required><input className={inp} placeholder="Last name" value={form.last_name} onChange={e=>f('last_name',e.target.value)} /></FL>
               </div>
-
-              <FL label="Middle name">
-                <input className={inp} placeholder="Middle name (optional)" value={form.middle_name} onChange={e=>f('middle_name',e.target.value)} />
-              </FL>
-
-              <FL label="Date of birth" required>
-                <input type="date" className={inp} value={form.date_of_birth} onChange={e=>f('date_of_birth',e.target.value)} />
-              </FL>
-
+              <FL label="Middle name"><input className={inp} placeholder="Middle name (optional)" value={form.middle_name} onChange={e=>f('middle_name',e.target.value)} /></FL>
+              <FL label="Date of birth" required><input type="date" className={inp} value={form.date_of_birth} onChange={e=>f('date_of_birth',e.target.value)} /></FL>
               <FL label="Country of citizenship" required>
                 <select className={sel} value={form.country_id} onChange={e=>f('country_id',e.target.value)}>
                   <option value="">Please choose a country</option>
                   {countryList.map(c=><option key={c.id} value={c.id}>{c.flag} {c.name}</option>)}
                 </select>
               </FL>
-
-              <FL label="Passport number" hint="Passport number is optional, but strongly recommended.">
-                <input className={inp} placeholder="e.g. AB1234567" value={form.passport_no} onChange={e=>f('passport_no',e.target.value)} />
-              </FL>
-
-              <FL label="Passport expiry date">
-                <input type="date" className={inp} value={form.passport_expiry} onChange={e=>f('passport_expiry',e.target.value)} />
-              </FL>
-
+              <FL label="Passport number" hint="Passport number is optional, but strongly recommended."><input className={inp} placeholder="e.g. AB1234567" value={form.passport_no} onChange={e=>f('passport_no',e.target.value)} /></FL>
+              <FL label="Passport expiry date"><input type="date" className={inp} value={form.passport_expiry} onChange={e=>f('passport_expiry',e.target.value)} /></FL>
               <FL label="Gender">
                 <div className="flex gap-6 mt-1">
                   {['Male','Female'].map(g=>(
@@ -173,85 +228,243 @@ function AddStudentModal({ open, onClose, onSaved, countries: countryList, agent
               </FL>
             </div>
           </div>
-
-          {/* ── Contact Information ── */}
           <div>
             <h3 className="text-base font-bold text-slate-800 mb-4">Contact information</h3>
             <div className="space-y-4">
-              <FL label="Student Email" required hint="This email will be used for the student's login account.">
-                <input type="email" className={inp} placeholder="student@email.com" value={form.email} onChange={e=>f('email',e.target.value)} />
-              </FL>
-              <FL label="Phone number">
-                <input className={inp} placeholder="+92 300 1234567" value={form.phone} onChange={e=>f('phone',e.target.value)} />
-              </FL>
+              <FL label="Student Email" required hint="This email will be used for the student's login account."><input type="email" className={inp} placeholder="student@email.com" value={form.email} onChange={e=>f('email',e.target.value)} /></FL>
+              <FL label="Phone number"><input className={inp} placeholder="+92 300 1234567" value={form.phone} onChange={e=>f('phone',e.target.value)} /></FL>
+              <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/50">
+                <p className="text-sm font-semibold text-slate-700 mb-3">Do any of your documents show a different name than your passport? <span className="text-red-500">*</span></p>
+                <div className="flex gap-6 mb-3">
+                  {['yes','no'].map(v=>(
+                    <label key={v} className="flex items-center gap-2 cursor-pointer">
+                      <div onClick={()=>f('different_name',v)} className={`w-5 h-5 rounded-full border-2 flex items-center justify-center cursor-pointer transition-all ${form.different_name===v ? 'border-brand-600 bg-brand-600' : 'border-slate-300 hover:border-brand-400'}`}>
+                        {form.different_name===v && <div className="w-2 h-2 rounded-full bg-white"/>}
+                      </div>
+                      <span className="text-sm text-slate-700 font-medium capitalize">{v}</span>
+                    </label>
+                  ))}
+                </div>
+                {form.different_name === 'yes' && (
+                  <div className="space-y-3 pt-3 border-t border-slate-200">
+                    <div className="grid grid-cols-3 gap-2">
+                      <FL label="Alternate First Name" required><input className={inp} value={form.alt_first_name} onChange={e=>f('alt_first_name',e.target.value)} placeholder="First"/></FL>
+                      <FL label="Alternate Middle Name"><input className={inp} value={form.alt_middle_name} onChange={e=>f('alt_middle_name',e.target.value)} placeholder="Middle"/></FL>
+                      <FL label="Alternate Last Name"><input className={inp} value={form.alt_last_name} onChange={e=>f('alt_last_name',e.target.value)} placeholder="Last"/></FL>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Upload Proof of Name Change <span className="text-red-500">*</span></p>
+                      <div className="border-2 border-dashed border-slate-200 rounded-xl p-3 text-center cursor-pointer hover:border-brand-300 transition-colors" onClick={()=>nameProofRef.current?.click()}>
+                        <input ref={nameProofRef} type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png"/>
+                        <p className="text-xs text-slate-400">Drag and drop, or <span className="text-brand-600 font-semibold">Browse Files</span></p>
+                        <p className="text-[10px] text-slate-300 mt-1">PDF, JPEG or PNG. Max 20MB</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-
-          {/* ── Lead Management ── */}
+          <div>
+            <h3 className="text-base font-bold text-slate-800 mb-4">Background Information</h3>
+            <div className="border border-slate-200 rounded-2xl p-4 space-y-5 bg-slate-50/50">
+              <div>
+                <p className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-1.5">Have you been refused a visa from Canada, the USA, the United Kingdom, New Zealand, Australia or Ireland? <span className="text-red-500">*</span></p>
+                <div className="flex gap-6">
+                  {['Yes','No'].map(v=>(
+                    <label key={v} className="flex items-center gap-2 cursor-pointer">
+                      <div onClick={()=>f('refused_visa',v)} className={`w-5 h-5 rounded-full border-2 flex items-center justify-center cursor-pointer transition-all ${form.refused_visa===v ? 'border-brand-600 bg-brand-600' : 'border-slate-300 hover:border-brand-400'}`}>
+                        {form.refused_visa===v && <div className="w-2 h-2 rounded-full bg-white"/>}
+                      </div>
+                      <span className="text-sm text-slate-700 font-medium">{v}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-700 mb-2">Do you have a valid Study Permit / Visa?</p>
+                <select className={sel} value={form.study_permit} onChange={e=>f('study_permit',e.target.value)}>
+                  <option value=""></option>
+                  <option value="Yes - Study Permit">Yes - Study Permit</option>
+                  <option value="Yes - Visitor Visa">Yes - Visitor Visa</option>
+                  <option value="Yes - Work Permit">Yes - Work Permit</option>
+                  <option value="No">No</option>
+                </select>
+              </div>
+              {(form.refused_visa === 'Yes' || (form.study_permit && form.study_permit !== 'No')) && (
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">If you answered 'Yes' to any of the questions above, please provide more details below:</p>
+                  <textarea rows={3} className={inp + ' resize-none'} value={form.background_details} onChange={e=>f('background_details',e.target.value)} placeholder="Please provide details…"/>
+                </div>
+              )}
+            </div>
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-800 mb-4">Test Scores</h3>
+            <div className="border border-slate-200 rounded-2xl p-4 space-y-4 bg-slate-50/50">
+              {[
+                { v:'has_proof', label:'I have or will have proof of language proficiency before I apply.' },
+                { v:'no_test_delayed', label:'I have not taken a language test and will only apply to programs allowing proof after acceptance.' },
+                { v:'exemption', label:'I believe my academic or nationality background may qualify me for an exemption.' },
+                { v:'no_plan', label:'I have not taken a language test, and do not plan to take one.' },
+              ].map(opt=>(
+                <label key={opt.v} className="flex items-start gap-2.5 cursor-pointer">
+                  <div onClick={()=>f('language_status',opt.v)} className={`w-5 h-5 rounded-full border-2 flex items-center justify-center cursor-pointer mt-0.5 shrink-0 transition-all ${form.language_status===opt.v ? 'border-brand-600 bg-brand-600' : 'border-slate-300 hover:border-brand-400'}`}>
+                    {form.language_status===opt.v && <div className="w-2 h-2 rounded-full bg-white"/>}
+                  </div>
+                  <span className="text-sm text-slate-700 leading-snug">{opt.label}</span>
+                </label>
+              ))}
+              {showEslNote && (
+                <div className="flex items-start gap-2.5 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700">
+                  <Info className="w-4 h-4 shrink-0 mt-0.5"/>Note: You will be able to apply for conditional admission by enrolling in an ESL program if the academic program does not accept delayed submission of English Language Proficiency scores.
+                </div>
+              )}
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input type="checkbox" checked={form.open_to_esl} onChange={e=>f('open_to_esl',e.target.checked)} className="w-4 h-4 accent-brand-600"/>
+                <span className="text-sm text-slate-700">I'm open to taking a language proficiency course before starting my academic program.</span>
+              </label>
+              {showEnglishExamFields && (
+                <div className="space-y-3 pt-3 border-t border-slate-200">
+                  <FL label="English exam type" required>
+                    <select className={sel} value={form.english_exam_type} onChange={e=>f('english_exam_type',e.target.value)}>
+                      <option value="">Select</option>
+                      {['IELTS','TOEFL','PTE','Duolingo','Cambridge (CAE/CPE)'].map(t=><option key={t}>{t}</option>)}
+                    </select>
+                  </FL>
+                  {form.english_exam_type === 'IELTS' && (
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                      <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">IELTS Scores</div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <FL label="Overall Score"><input type="number" step="0.5" min="0" max="9" className={inp} value={form.ielts_score} onChange={e=>f('ielts_score',e.target.value)} placeholder="7.0"/></FL>
+                        <FL label="Test Date"><input type="date" className={inp} value={form.ielts_date} onChange={e=>f('ielts_date',e.target.value)}/></FL>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2">
+                        {[['L','ielts_l'],['R','ielts_r'],['W','ielts_w'],['S','ielts_s']].map(([label,key])=>(
+                          <FL key={key} label={label}><input type="number" step="0.5" min="0" max="9" className={inp} value={form[key]} onChange={e=>f(key,e.target.value)} placeholder="7.0"/></FL>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {form.english_exam_type === 'TOEFL' && (
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                      <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">TOEFL Scores</div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <FL label="Total Score"><input type="number" className={inp} value={form.toefl_score} onChange={e=>f('toefl_score',e.target.value)} placeholder="100"/></FL>
+                        <FL label="Test Date"><input type="date" className={inp}/></FL>
+                      </div>
+                    </div>
+                  )}
+                  {form.english_exam_type === 'PTE' && (
+                    <div className="bg-white border border-slate-200 rounded-xl p-4">
+                      <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">PTE Score</div>
+                      <FL label="Score"><input type="number" className={inp} value={form.pte_score} onChange={e=>f('pte_score',e.target.value)} placeholder="65"/></FL>
+                    </div>
+                  )}
+                  {form.english_exam_type === 'Duolingo' && (
+                    <div className="bg-white border border-slate-200 rounded-xl p-4">
+                      <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Duolingo Score</div>
+                      <FL label="Score"><input type="number" className={inp} value={form.duolingo_score} onChange={e=>f('duolingo_score',e.target.value)} placeholder="110"/></FL>
+                    </div>
+                  )}
+                </div>
+              )}
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input type="checkbox" checked={form.has_gre} onChange={e=>f('has_gre',e.target.checked)} className="w-4 h-4 accent-brand-600"/>
+                <span className="text-sm text-slate-700">I have GRE exam scores</span>
+              </label>
+              {form.has_gre && (
+                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">GRE Scores</div>
+                  <FL label="GRE Exam Date" required><input type="date" className={inp} value={form.gre_date} onChange={e=>f('gre_date',e.target.value)}/></FL>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="text-xs font-bold text-slate-500 uppercase"></div>
+                    <div className="text-xs font-bold text-slate-600">Verbal</div>
+                    <div className="text-xs font-bold text-slate-600">Quantitative</div>
+                  </div>
+                  {[['Score','gre_v_score','gre_q_score'],['Rank','gre_v_rank','gre_q_rank']].map(([label,k1,k2])=>(
+                    <div key={label} className="grid grid-cols-3 gap-2 items-center">
+                      <div className="text-xs text-slate-500 font-semibold">{label}</div>
+                      <input className={inp} value={form[k1]} onChange={e=>f(k1,e.target.value)} placeholder="—"/>
+                      <input className={inp} value={form[k2]} onChange={e=>f(k2,e.target.value)} placeholder="—"/>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input type="checkbox" checked={form.has_gmat} onChange={e=>f('has_gmat',e.target.checked)} className="w-4 h-4 accent-brand-600"/>
+                <span className="text-sm text-slate-700">I have GMAT exam scores</span>
+              </label>
+              {form.has_gmat && (
+                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">GMAT Scores</div>
+                  <FL label="GMAT Exam Date" required><input type="date" className={inp} value={form.gmat_date} onChange={e=>f('gmat_date',e.target.value)}/></FL>
+                  <div className="grid grid-cols-4 gap-2">
+                    {['Verbal','Quantitative','Writing','Total'].map(col=>(
+                      <div key={col} className="text-xs font-bold text-slate-600 text-center">{col}</div>
+                    ))}
+                  </div>
+                  {[['Score','gmat_v_score','gmat_q_score','gmat_w_score','gmat_total_score'],['Rank','gmat_v_rank','gmat_q_rank','gmat_w_rank','gmat_total_rank']].map(([label,...keys])=>(
+                    <div key={label} className="grid grid-cols-4 gap-2 items-center">
+                      {keys.map(k=>(<input key={k} className={inp} value={form[k]} onChange={e=>f(k,e.target.value)} placeholder="—"/>))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
           <div>
             <h3 className="text-base font-bold text-slate-800 mb-4">Lead management</h3>
             <div className="space-y-4">
-
               <FL label="Status">
                 <select className={sel} value={form.lead_status} onChange={e=>f('lead_status',e.target.value)}>
                   <option value="">Please choose a status</option>
                   {LEAD_STATUSES.map(s=><option key={s}>{s}</option>)}
                 </select>
               </FL>
-
               <FL label="Referral Source">
                 <select className={sel} value={form.referral_source} onChange={e=>f('referral_source',e.target.value)}>
                   <option value="">Please choose a referral source</option>
                   {REFERRAL_SOURCES.map(s=><option key={s}>{s}</option>)}
                 </select>
               </FL>
-
               <FL label="Assign Agent">
                 <select className={sel} value={form.agent_id} onChange={e=>f('agent_id',e.target.value)}>
                   <option value="">No agent assigned</option>
                   {agents.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
                 </select>
               </FL>
-
               <FL label="Country of Interest">
                 <select className={sel} value={form.country_of_interest} onChange={e=>f('country_of_interest',e.target.value)}>
                   <option value="">Search country…</option>
                   {COUNTRIES.map(c=><option key={c}>{c}</option>)}
                 </select>
               </FL>
-
               <FL label="Services of Interest">
                 <div className="grid grid-cols-2 gap-2 mt-1">
                   {SERVICES.map(s=>(
-                    <label key={s} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition-all text-sm font-medium
-                      ${form.services_of_interest.includes(s) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600 hover:border-brand-300'}`}>
-                      <input type="checkbox" checked={form.services_of_interest.includes(s)} onChange={()=>toggleService(s)} className="w-3.5 h-3.5 accent-brand-600" />
-                      {s}
+                    <label key={s} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition-all text-sm font-medium ${form.services_of_interest.includes(s) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600 hover:border-brand-300'}`}>
+                      <input type="checkbox" checked={form.services_of_interest.includes(s)} onChange={()=>toggleService(s)} className="w-3.5 h-3.5 accent-brand-600" />{s}
                     </label>
                   ))}
                 </div>
               </FL>
-
               <FL label="Education Level">
                 <select className={sel} value={form.education_level} onChange={e=>f('education_level',e.target.value)}>
                   <option value="">Select education level</option>
                   {EDU_LEVELS.map(l=><option key={l}>{l}</option>)}
                 </select>
               </FL>
-
               <FL label="Recruiter Type">
                 <select className={sel} value={form.recruiter_type} onChange={e=>f('recruiter_type',e.target.value)}>
                   {RECRUITER_TYPES.map(t=><option key={t}>{t}</option>)}
                 </select>
               </FL>
-
               <FL label="Notes">
                 <textarea rows={3} className={inp + ' resize-none'} placeholder="Any additional notes about this student…" value={form.notes} onChange={e=>f('notes',e.target.value)} />
               </FL>
             </div>
           </div>
-
-          {/* ── Consent ── */}
           <label className="flex items-start gap-3 cursor-pointer group">
             <input type="checkbox" checked={form.consent} onChange={e=>f('consent',e.target.checked)} className="w-4 h-4 mt-0.5 accent-brand-600 shrink-0" />
             <span className="text-sm text-slate-600 leading-relaxed">
@@ -260,14 +473,9 @@ function AddStudentModal({ open, onClose, onSaved, countries: countryList, agent
             </span>
           </label>
         </div>
-
-        {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50 shrink-0 gap-3">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border-2 border-slate-200 text-slate-700 font-bold hover:bg-white transition-colors text-sm">
-            Cancel
-          </button>
-          <button onClick={handleSubmit} disabled={saving}
-            className="flex-1 py-2.5 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-bold transition-colors text-sm disabled:opacity-60 flex items-center justify-center gap-2 shadow-sm">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border-2 border-slate-200 text-slate-700 font-bold hover:bg-white transition-colors text-sm">Cancel</button>
+          <button onClick={handleSubmit} disabled={saving} className="flex-1 py-2.5 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-bold transition-colors text-sm disabled:opacity-60 flex items-center justify-center gap-2 shadow-sm">
             {saving && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
             Add student
           </button>
@@ -277,7 +485,6 @@ function AddStudentModal({ open, onClose, onSaved, countries: countryList, agent
   );
 }
 
-// ── Edit Student Modal ────────────────────────────────────────
 function EditStudentModal({ open, student, onClose, onSaved, countries: countryList, agents }) {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
@@ -300,11 +507,8 @@ function EditStudentModal({ open, student, onClose, onSaved, countries: countryL
 
   async function handleSubmit() {
     setSaving(true); setError('');
-    try {
-      await apiCall(`/api/students/${student.id}`,'PUT',form);
-      onSaved();
-      onClose();
-    } catch(e) { setError(e.message); }
+    try { await apiCall(`/api/students/${student.id}`,'PUT',form); onSaved(); onClose(); }
+    catch(e) { setError(e.message); }
     finally { setSaving(false); }
   }
 
@@ -323,7 +527,6 @@ function EditStudentModal({ open, student, onClose, onSaved, countries: countryL
         </div>
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3">{error}</div>}
-
           <div>
             <h3 className="text-sm font-bold text-slate-700 mb-3 pb-2 border-b border-slate-100">Contact</h3>
             <div className="grid grid-cols-2 gap-3">
@@ -336,7 +539,6 @@ function EditStudentModal({ open, student, onClose, onSaved, countries: countryL
               </FL>
             </div>
           </div>
-
           <div>
             <h3 className="text-sm font-bold text-slate-700 mb-3 pb-2 border-b border-slate-100">Academic</h3>
             <div className="grid grid-cols-2 gap-3 mb-3">
@@ -354,7 +556,6 @@ function EditStudentModal({ open, student, onClose, onSaved, countries: countryL
               </select>
             </FL>
           </div>
-
           <div>
             <h3 className="text-sm font-bold text-slate-700 mb-3 pb-2 border-b border-slate-100">Lead Management</h3>
             <div className="grid grid-cols-2 gap-3 mb-3">
@@ -389,7 +590,6 @@ function EditStudentModal({ open, student, onClose, onSaved, countries: countryL
               </select>
             </FL>
           </div>
-
           <div>
             <h3 className="text-sm font-bold text-slate-700 mb-3 pb-2 border-b border-slate-100">Notes</h3>
             <textarea rows={3} className={inp + ' resize-none'} value={form.notes} onChange={e=>f('notes',e.target.value)} placeholder="Any notes…" />
@@ -397,8 +597,7 @@ function EditStudentModal({ open, student, onClose, onSaved, countries: countryL
         </div>
         <div className="flex gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50 shrink-0">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border-2 border-slate-200 text-slate-700 font-bold hover:bg-white transition-colors text-sm">Cancel</button>
-          <button onClick={handleSubmit} disabled={saving}
-            className="flex-1 py-2.5 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-bold transition-colors text-sm disabled:opacity-60 flex items-center justify-center gap-2">
+          <button onClick={handleSubmit} disabled={saving} className="flex-1 py-2.5 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-bold transition-colors text-sm disabled:opacity-60 flex items-center justify-center gap-2">
             {saving && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
             Save Changes
           </button>
@@ -411,6 +610,10 @@ function EditStudentModal({ open, student, onClose, onSaved, countries: countryL
 // ── Main Page ─────────────────────────────────────────────────
 export default function StudentsPage() {
   const router = useRouter();
+
+  // ── PERMISSIONS ──────────────────────────────────────────────
+  const { can, isRestricted, loading: permLoading } = useAdminPermissions();
+
   const [students, setStudents] = useState([]);
   const [total, setTotal]       = useState(0);
   const [pages, setPages]       = useState(1);
@@ -429,6 +632,15 @@ export default function StudentsPage() {
   const [showView, setShowView] = useState(false);
   const [selected, setSelected] = useState(null);
   const LIMIT = 20;
+
+  // Block page if no view access
+  if (!permLoading && isRestricted && !can('students', 'view')) {
+    return (
+      <AdminLayout title="Students">
+        <AccessDenied message="You don't have permission to view students." />
+      </AdminLayout>
+    );
+  }
 
   const buildParams = useCallback(() => {
     const p = new URLSearchParams({ page, limit:LIMIT, sort, dir, ...colFilters, ...panelFilters });
@@ -495,8 +707,6 @@ export default function StudentsPage() {
 
   return (
     <AdminLayout title="Students">
-
-      {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="text-xl font-bold text-slate-800" style={{fontFamily:'Georgia,serif'}}>Students</h2>
@@ -504,8 +714,7 @@ export default function StudentsPage() {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowFilters(f=>!f)}
-            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-sm font-semibold transition-all
-              ${showFilters||activeFiltersCount>0 ? 'bg-brand-50 border-brand-300 text-brand-700' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-sm font-semibold transition-all ${showFilters||activeFiltersCount>0 ? 'bg-brand-50 border-brand-300 text-brand-700' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}>
             <Filter className="w-4 h-4" /> Filters
             {activeFiltersCount>0 && <span className="bg-brand-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{activeFiltersCount}</span>}
           </button>
@@ -514,14 +723,16 @@ export default function StudentsPage() {
             <button onClick={()=>setView('grid')} className={`p-2 rounded-lg transition-colors ${view==='grid'?'bg-brand-700 text-white':'text-slate-500 hover:text-slate-700'}`}><Grid3x3 className="w-4 h-4" /></button>
           </div>
           <button onClick={load} className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 transition-colors"><RefreshCw className="w-4 h-4" /></button>
-          <button onClick={()=>setShowAdd(true)}
-            className="flex items-center gap-2 bg-brand-700 hover:bg-brand-800 text-white font-bold px-4 py-2.5 rounded-xl transition-colors shadow-sm text-sm">
-            <Plus className="w-4 h-4" /> Add new student
-          </button>
+          {/* ── PERMISSION GATE: Add new student ── */}
+          {can('students', 'create') && (
+            <button onClick={()=>setShowAdd(true)}
+              className="flex items-center gap-2 bg-brand-700 hover:bg-brand-800 text-white font-bold px-4 py-2.5 rounded-xl transition-colors shadow-sm text-sm">
+              <Plus className="w-4 h-4" /> Add new student
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Filter panel */}
       {showFilters && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-4">
           <div className="flex items-center justify-between mb-4">
@@ -554,7 +765,6 @@ export default function StudentsPage() {
         </div>
       )}
 
-      {/* Table */}
       {view==='table' ? (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           {loading ? <div className="flex justify-center py-20"><Spinner size="lg" /></div>
@@ -586,9 +796,12 @@ export default function StudentsPage() {
                       <tr key={s.id} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
                         <td className="px-3 py-3">
                           <div className="flex items-center gap-0.5">
+                            {/* View — always visible */}
                             <button onClick={()=>router.push(`/admin/student/${s.id}`)} className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-brand-600 transition-colors" title="View full profile"><Eye className="w-3.5 h-3.5" /></button>
-                            <button onClick={()=>{setSelected(s);setShowEdit(true);}} className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-brand-600 transition-colors" title="Edit"><Pencil className="w-3.5 h-3.5" /></button>
-                            <button onClick={()=>handleDelete(s)} className="p-1.5 rounded-lg hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                            {/* Edit — permission gated */}
+                            {can('students', 'edit') && <button onClick={()=>{setSelected(s);setShowEdit(true);}} className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-brand-600 transition-colors" title="Edit"><Pencil className="w-3.5 h-3.5" /></button>}
+                            {/* Delete — permission gated */}
+                            {can('students', 'delete') && <button onClick={()=>handleDelete(s)} className="p-1.5 rounded-lg hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>}
                           </div>
                         </td>
                         <td className="px-3 py-3"><button onClick={()=>{setSelected(s);setShowView(true);}} className="font-mono text-xs text-brand-600 hover:underline font-bold">{s.id}</button></td>
@@ -632,8 +845,9 @@ export default function StudentsPage() {
                   <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                     <AppBadges row={s} />
                     <div className="flex gap-1">
-                      <button onClick={()=>{setSelected(s);setShowEdit(true);}} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-brand-600 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
-                      <button onClick={()=>handleDelete(s)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                      {/* Edit/Delete gated in grid view too */}
+                      {can('students', 'edit') && <button onClick={()=>{setSelected(s);setShowEdit(true);}} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-brand-600 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>}
+                      {can('students', 'delete') && <button onClick={()=>handleDelete(s)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>}
                     </div>
                   </div>
                 </div>
@@ -642,7 +856,6 @@ export default function StudentsPage() {
         </div>
       )}
 
-      {/* Pagination */}
       {!loading && pages>1 && (
         <div className="flex items-center justify-between mt-4 text-sm text-slate-600">
           <span>Showing {((page-1)*LIMIT)+1}–{Math.min(page*LIMIT,total)} of {total}</span>
@@ -654,11 +867,10 @@ export default function StudentsPage() {
         </div>
       )}
 
-      {/* Modals */}
-      <AddStudentModal open={showAdd} onClose={()=>setShowAdd(false)} onSaved={load} countries={countries} agents={agents} />
-      <EditStudentModal open={showEdit} student={selected} onClose={()=>setShowEdit(false)} onSaved={load} countries={countries} agents={agents} />
+      {/* Modals — gated */}
+      {can('students', 'create') && <AddStudentModal open={showAdd} onClose={()=>setShowAdd(false)} onSaved={load} countries={countries} agents={agents} />}
+      {can('students', 'edit')   && <EditStudentModal open={showEdit} student={selected} onClose={()=>setShowEdit(false)} onSaved={load} countries={countries} agents={agents} />}
 
-      {/* View modal */}
       {showView && selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-end">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={()=>setShowView(false)} />
@@ -687,15 +899,15 @@ export default function StudentsPage() {
                   </div>
                 ))}
               </div>
-              <div>
-                <div className="text-xs font-semibold text-slate-500 mb-2">Applications</div>
-                <AppBadges row={selected} />
-              </div>
+              <div><div className="text-xs font-semibold text-slate-500 mb-2">Applications</div><AppBadges row={selected} /></div>
               {selected.notes && <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-slate-700"><span className="text-xs font-bold text-amber-600 block mb-1">Notes</span>{selected.notes}</div>}
             </div>
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 shrink-0">
-              <button onClick={()=>{setShowView(false);setShowEdit(true);}} className="w-full py-2.5 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-bold text-sm transition-colors">Edit Student</button>
-            </div>
+            {/* Edit button gated */}
+            {can('students', 'edit') && (
+              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 shrink-0">
+                <button onClick={()=>{setShowView(false);setShowEdit(true);}} className="w-full py-2.5 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-bold text-sm transition-colors">Edit Student</button>
+              </div>
+            )}
           </div>
         </div>
       )}
