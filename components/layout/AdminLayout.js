@@ -7,7 +7,7 @@ import {
   FileText, Settings, LogOut, Bell, Menu, X, ChevronDown, ChevronLeft,
   Receipt, Shield,
   TrendingUp, ChevronRight, BookOpen, Home, Search, CheckCircle, PanelLeftClose, PanelLeftOpen, HelpCircle,
-  UserCog, Users2
+  UserCog, Users2, Hotel
 } from 'lucide-react';
 import { fetchUser } from '../../lib/auth';
 import { Spinner } from '../ui/index';
@@ -33,12 +33,13 @@ const NAV = {
     {
       group: 'System',
       items: [
-        { label: 'Employees', href: '/admin/employees', icon: Users2     },
-        { label: 'Invoices',  href: '/admin/invoices',  icon: Receipt    },
-        { label: 'Roles',     href: '/admin/roles',     icon: Shield     },
-        { label: 'Reports',   href: '/admin/reports',   icon: TrendingUp },
-        { label: 'Questions', href: '/admin/questions', icon: HelpCircle },
-        { label: 'Settings',  href: '/admin/settings',  icon: Settings   },
+        { label: 'Hotels',     href: '/admin/hotels',     icon: Hotel,      activeOn: ['/admin/hotels', '/admin/hotels/'] },
+        { label: 'Employees',  href: '/admin/employees',  icon: Users2     },
+        { label: 'Invoices',   href: '/admin/invoices',   icon: Receipt    },
+        { label: 'Roles',      href: '/admin/roles',      icon: Shield     },
+        { label: 'Reports',    href: '/admin/reports',    icon: TrendingUp },
+        { label: 'Questions',  href: '/admin/questions',  icon: HelpCircle },
+        { label: 'Settings',   href: '/admin/settings',   icon: Settings   },
       ],
     },
   ],
@@ -75,7 +76,7 @@ const NAV = {
     },
   ],
 
-  // ── Admin Employee — only sees their assigned agent's world ──
+  // ── Admin Employee ──
   admin_employee: [
     {
       group: 'Menu',
@@ -94,24 +95,23 @@ const NAV = {
     },
   ],
 
-  // ── Agent Employee — only sees their assigned students ──
   // ── Agent Employee — uses SAME pages as agent, permissions control access ──
-agent_employee: [
-  {
-    group: 'Menu',
-    items: [
-      { label: 'Dashboard',       href: '/agent/dashboard',    icon: LayoutDashboard },
-      { label: 'My Students',     href: '/agent/students',     icon: Users,
-        activeOn: ['/agent/students', '/agent/student'] },
-      { label: 'Applications',    href: '/agent/applications', icon: FileText,
-        activeOn: ['/agent/applications'] },
-      { label: 'Programs',        href: '/agent/universities', icon: BookOpen,
-        activeOn: ['/agent/universities', '/agent/university', '/agent/program'] },
-      { label: 'Chat with Agent', href: '/agent/chat',         icon: MessageSquare,
-        activeOn: ['/agent/chat'] },
-    ],
-  },
-],
+  agent_employee: [
+    {
+      group: 'Menu',
+      items: [
+        { label: 'Dashboard',       href: '/agent/dashboard',    icon: LayoutDashboard },
+        { label: 'My Students',     href: '/agent/students',     icon: Users,
+          activeOn: ['/agent/students', '/agent/student'] },
+        { label: 'Applications',    href: '/agent/applications', icon: FileText,
+          activeOn: ['/agent/applications'] },
+        { label: 'Programs',        href: '/agent/universities', icon: BookOpen,
+          activeOn: ['/agent/universities', '/agent/university', '/agent/program'] },
+        { label: 'Chat with Agent', href: '/agent/chat',         icon: MessageSquare,
+          activeOn: ['/agent/chat'] },
+      ],
+    },
+  ],
 };
 
 const ROLE_CONFIG = {
@@ -123,7 +123,6 @@ const ROLE_CONFIG = {
   agent_employee: { label: 'Agent Employee',  dot: 'bg-teal-400',    badge: 'bg-teal-100 text-teal-700'       },
 };
 
-// Roles that are allowed to use this layout
 const ALLOWED_ROLES = ['admin', 'agent', 'student', 'custom', 'admin_employee', 'agent_employee'];
 
 export default function AdminLayout({ children, title = 'Dashboard' }) {
@@ -149,13 +148,11 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
       setUser(u);
       setAuthLoading(false);
     });
-    // Load portal settings (non-blocking)
     fetch('/api/settings').then(r => r.json()).then(d => {
       if (d.settings) setPortalSettings(d.settings);
     }).catch(() => {});
   }, []);
 
-  // Close dropdown on outside click
   useEffect(() => {
     function handle(e) {
       if (dropRef.current && !dropRef.current.contains(e.target)) setDropOpen(false);
@@ -190,7 +187,6 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
   // ── Build nav groups ──────────────────────────────────────────
   const navGroups = (() => {
     if (user?.role === 'custom') {
-      // Build nav dynamically from permissions
       const perms = user.permissions || {};
       const ALL_ITEMS = [
         { label: 'Dashboard',     href: '/admin/dashboard',    icon: LayoutDashboard, module: 'dashboard'    },
@@ -199,6 +195,7 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
         { label: 'Search & Apply',href: '/admin/programs',     icon: BookOpen,        module: 'programs',     activeOn: ['/admin/programs', '/admin/program']        },
         { label: 'Agents',        href: '/admin/agents',       icon: UserCheck,       module: 'agents',       activeOn: ['/admin/agents', '/admin/agent']            },
         { label: 'Applications',  href: '/admin/applications', icon: FileText,        module: 'applications', activeOn: ['/admin/applications', '/admin/application'] },
+        { label: 'Hotels',        href: '/admin/hotels',       icon: Hotel,           module: 'hotels',       activeOn: ['/admin/hotels'] },
         { label: 'Invoices',      href: '/admin/invoices',     icon: Receipt,         module: 'invoices'  },
         { label: 'Reports',       href: '/admin/reports',      icon: TrendingUp,      module: 'reports'   },
         { label: 'Settings',      href: '/admin/settings',     icon: Settings,        module: 'settings'  },
@@ -213,7 +210,6 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
         : [{ group: 'Menu', items: [{ label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard }] }];
     }
 
-    // admin_employee: optionally add Universities / Programs based on permissions
     if (user?.role === 'admin_employee') {
       const base = NAV.admin_employee[0].items;
       const extra = [];
@@ -230,7 +226,6 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
   const roleCfg  = ROLE_CONFIG[user?.role] || ROLE_CONFIG.student;
   const initials = (user?.name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
-  // Role label shown in topbar & dropdown
   function getRoleLabel() {
     if (user?.role === 'custom')          return user?.customRoleName || 'Staff';
     if (user?.role === 'admin_employee')  return user?.designation   || 'Admin Employee';
@@ -238,13 +233,12 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
     return user?.role;
   }
 
-  // Home dashboard path per role
   function getDashboardPath() {
-  if (user?.role === 'custom')          return '/admin/dashboard';
-  if (user?.role === 'admin_employee')  return '/admin/dashboard';
-  if (user?.role === 'agent_employee')  return '/agent/dashboard';
-  return `/${user?.role}/dashboard`;
-}
+    if (user?.role === 'custom')          return '/admin/dashboard';
+    if (user?.role === 'admin_employee')  return '/admin/dashboard';
+    if (user?.role === 'agent_employee')  return '/agent/dashboard';
+    return `/${user?.role}/dashboard`;
+  }
 
   // ── Sidebar inner ─────────────────────────────────────────────
   function SidebarContent({ isMobile = false }) {
@@ -289,7 +283,6 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
               </div>
             </div>
 
-            {/* Show assigned agent for admin_employee */}
             {user?.role === 'admin_employee' && user?.agentName && (
               <div className="mt-2 flex items-center gap-1.5 bg-blue-50 border border-blue-100 rounded-lg px-3 py-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"/>
@@ -297,7 +290,6 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
               </div>
             )}
 
-            {/* Show agent name for agent_employee */}
             {user?.role === 'agent_employee' && user?.agentName && (
               <div className="mt-2 flex items-center gap-1.5 bg-teal-50 border border-teal-100 rounded-lg px-3 py-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0"/>
@@ -317,7 +309,6 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
         <nav className="flex-1 overflow-y-auto py-3" style={{ scrollbarWidth: 'none' }}>
           {navGroups.map(group => (
             <div key={group.group} className={`mb-4 ${collapsed && !isMobile ? 'px-2' : 'px-3'}`}>
-              {/* Group label */}
               {(!collapsed || isMobile) && (
                 <div className="px-3 mb-2">
                   <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">{group.group}</span>
@@ -340,12 +331,9 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
                           ? 'bg-emerald-50 text-emerald-700 shadow-sm'
                           : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'}
                       `}>
-                      {/* Active indicator bar */}
                       {active && !collapsed && (
                         <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-emerald-500 rounded-r-full" />
                       )}
-
-                      {/* Icon */}
                       <div className={`
                         flex items-center justify-center shrink-0 rounded-lg transition-all
                         ${collapsed && !isMobile ? 'w-9 h-9' : 'w-8 h-8'}
@@ -355,13 +343,9 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
                       `}>
                         <Icon className="w-4 h-4" />
                       </div>
-
-                      {/* Label */}
                       {(!collapsed || isMobile) && (
                         <span className={`flex-1 ${active ? 'text-emerald-700 font-semibold' : ''}`}>{label}</span>
                       )}
-
-                      {/* Active arrow */}
                       {active && (!collapsed || isMobile) && (
                         <ChevronRight className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                       )}
@@ -409,41 +393,35 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
 
-      {/* ── Mobile overlay ── */}
       {mobileOpen && (
         <div className="fixed inset-0 bg-black/40 z-40 lg:hidden backdrop-blur-sm"
           onClick={() => setMobileOpen(false)} />
       )}
 
-      {/* ── Desktop sidebar ── */}
+      {/* Desktop sidebar */}
       <div className={`hidden lg:flex flex-col h-screen sticky top-0 shrink-0 transition-all duration-300 ease-in-out ${collapsed ? 'w-[72px]' : 'w-64'}`}>
         <SidebarContent isMobile={false} />
       </div>
 
-      {/* ── Mobile sidebar (slide in) ── */}
+      {/* Mobile sidebar */}
       <div className={`fixed inset-y-0 left-0 z-50 w-64 flex flex-col lg:hidden transition-transform duration-300 ease-in-out ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <SidebarContent isMobile={true} />
       </div>
 
-      {/* ── Main content ── */}
+      {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
 
         {/* Topbar */}
         <header className="bg-white border-b border-slate-200 px-4 lg:px-6 h-16 flex items-center gap-4 shrink-0 z-10 shadow-sm">
-
-          {/* Mobile menu toggle */}
           <button className="lg:hidden p-2 rounded-xl hover:bg-slate-100 text-slate-500 transition-colors"
             onClick={() => setMobileOpen(true)}>
             <Menu className="w-5 h-5" />
           </button>
-
-          {/* Desktop collapse toggle in topbar */}
           <button className="hidden lg:flex p-2 rounded-xl hover:bg-slate-100 text-slate-500 transition-colors"
             onClick={() => setCollapsed(c => !c)}>
             {collapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
           </button>
 
-          {/* Page title breadcrumb */}
           <div className="flex items-center gap-2 text-sm">
             <span className="text-slate-400 text-xs capitalize hidden sm:block">{getRoleLabel()}</span>
             <ChevronRight className="w-3.5 h-3.5 text-slate-300 hidden sm:block" />
@@ -451,8 +429,6 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-
-            {/* Notification bell */}
             <button className="relative p-2.5 rounded-xl hover:bg-slate-100 transition-colors text-slate-500 group">
               <Bell className="w-5 h-5 group-hover:text-emerald-600 transition-colors" />
               <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
@@ -460,7 +436,6 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
 
             <div className="w-px h-6 bg-slate-200 mx-1" />
 
-            {/* User dropdown */}
             <div className="relative" ref={dropRef}>
               <button onClick={() => setDropOpen(d => !d)}
                 className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl hover:bg-slate-100 transition-colors">
@@ -476,7 +451,6 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
 
               {dropOpen && (
                 <div className="absolute right-0 top-full mt-2 w-60 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50">
-                  {/* User info */}
                   <div className="px-4 py-3 border-b border-slate-100 mb-1">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
@@ -492,8 +466,6 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
                       </div>
                     </div>
                   </div>
-
-                  {/* Links */}
                   <Link href={getDashboardPath()} onClick={() => setDropOpen(false)}
                     className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-emerald-700 transition-colors font-medium">
                     <Home className="w-4 h-4" />Dashboard
