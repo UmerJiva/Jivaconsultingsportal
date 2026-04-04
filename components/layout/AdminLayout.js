@@ -7,7 +7,7 @@ import {
   FileText, Settings, LogOut, Bell, Menu, X, ChevronDown, ChevronLeft,
   Receipt, Shield,
   TrendingUp, ChevronRight, BookOpen, Home, Search, CheckCircle, PanelLeftClose, PanelLeftOpen, HelpCircle,
-  UserCog, Users2, Hotel
+  UserCog, Users2, Hotel, Inbox
 } from 'lucide-react';
 import { fetchUser } from '../../lib/auth';
 import { Spinner } from '../ui/index';
@@ -34,6 +34,7 @@ const NAV = {
       group: 'System',
       items: [
         { label: 'Hotels',     href: '/admin/hotels',     icon: Hotel,      activeOn: ['/admin/hotels', '/admin/hotels/'] },
+        { label: 'Leads',      href: '/admin/leads',      icon: Inbox,      activeOn: ['/admin/leads'] },
         { label: 'Employees',  href: '/admin/employees',  icon: Users2     },
         { label: 'Invoices',   href: '/admin/invoices',   icon: Receipt    },
         { label: 'Roles',      href: '/admin/roles',      icon: Shield     },
@@ -196,6 +197,7 @@ export default function AdminLayout({ children, title = 'Dashboard' }) {
         { label: 'Agents',        href: '/admin/agents',       icon: UserCheck,       module: 'agents',       activeOn: ['/admin/agents', '/admin/agent']            },
         { label: 'Applications',  href: '/admin/applications', icon: FileText,        module: 'applications', activeOn: ['/admin/applications', '/admin/application'] },
         { label: 'Hotels',        href: '/admin/hotels',       icon: Hotel,           module: 'hotels',       activeOn: ['/admin/hotels'] },
+        { label: 'Leads',         href: '/admin/leads',        icon: Inbox,            module: 'leads',        activeOn: ['/admin/leads']  },
         { label: 'Invoices',      href: '/admin/invoices',     icon: Receipt,         module: 'invoices'  },
         { label: 'Reports',       href: '/admin/reports',      icon: TrendingUp,      module: 'reports'   },
         { label: 'Settings',      href: '/admin/settings',     icon: Settings,        module: 'settings'  },

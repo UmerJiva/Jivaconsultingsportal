@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from '../../../../components/layout/AdminLayout';
 import {
-  Save, ArrowLeft, Plus, Trash2, X, Upload, Image,
+  Save, ArrowLeft, Plus, Trash2, X, Upload, Pencil , Image,
   Loader2, AlertCircle, CheckCircle, GripVertical,
   Star, Building2, MapPin, Image as ImageIcon
 } from 'lucide-react';

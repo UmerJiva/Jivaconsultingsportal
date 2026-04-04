@@ -869,4 +869,4 @@ export default function ApplicationDetail() {
       <ViewDocModal doc={viewDocModal} onClose={()=>setViewDocModal(null)}/>
     </AdminLayout>
   );
-}
+} 

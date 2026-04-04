@@ -19,7 +19,7 @@ function ScoreBadge({ score, label, count, large }) {
         <div className="text-xs text-slate-500">{count} reviews</div>
       </div>
       <div className={`${color} text-white font-bold ${large ? 'text-xl px-3 py-2' : 'text-base px-2.5 py-1.5'} rounded-lg`}>
-        {score?.toFixed(1)}
+        {Number(score || 0).toFixed(1)}
       </div>
     </div>
   );
@@ -509,7 +509,7 @@ export default function HotelDetailPage() {
                             <div className="font-bold text-slate-800">{review.reviewer_name}</div>
                             <div className="text-xs text-slate-400">{review.reviewer_country} · {new Date(review.created_at).toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</div>
                           </div>
-                          <div className="bg-blue-600 text-white font-bold text-sm px-2 py-1 rounded-lg">{review.score.toFixed(1)}</div>
+                          <div className="bg-blue-600 text-white font-bold text-sm px-2 py-1 rounded-lg">{Number(review.score).toFixed(1)}</div>
                         </div>
                         {review.positive_review && (
                           <div className="text-sm text-slate-700 mb-1">
