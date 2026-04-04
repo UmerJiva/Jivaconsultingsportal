@@ -1,10 +1,17 @@
 // pages/api/programs/index.js
 import { query } from '../../../lib/db';
-import { withAuth } from '../../../lib/auth';
 
 function searchLike(s) { return `%${s}%`; }
 
-async function handler(req, res) {
+function setCors(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
+export default async function handler(req, res) {
+  setCors(res);
+  if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   const {
@@ -26,16 +33,16 @@ async function handler(req, res) {
       const l = searchLike(search);
       params.push(l, l, l, l);
     }
-    if (level)         { where += ' AND p.level = ?';                    params.push(level); }
-    if (country)       { where += ' AND c.name = ?';                     params.push(country); }
-    if (university_id) { where += ' AND p.university_id = ?';            params.push(university_id); }
-    if (tag)           { where += ' AND FIND_IN_SET(?, p.tags)';         params.push(tag); }
-    if (field)         { where += ' AND p.field_of_study = ?';           params.push(field); }
+    if (level)         { where += ' AND p.level = ?';                         params.push(level); }
+    if (country)       { where += ' AND c.name = ?';                          params.push(country); }
+    if (university_id) { where += ' AND p.university_id = ?';                 params.push(university_id); }
+    if (tag)           { where += ' AND FIND_IN_SET(?, p.tags)';              params.push(tag); }
+    if (field)         { where += ' AND p.field_of_study = ?';                params.push(field); }
     if (intake)        { where += ' AND FIND_IN_SET(?, p.available_intakes)'; params.push(intake); }
     if (instant === 'submission') { where += ' AND p.instant_submission = 1'; }
-    if (instant === 'offer')      { where += ' AND p.instant_offer = 1'; }
-    if (min_fee)       { where += ' AND p.tuition_fee >= ?';             params.push(parseFloat(min_fee)); }
-    if (max_fee)       { where += ' AND p.tuition_fee <= ?';             params.push(parseFloat(max_fee)); }
+    if (instant === 'offer')      { where += ' AND p.instant_offer = 1';      }
+    if (min_fee)       { where += ' AND p.tuition_fee >= ?';                  params.push(parseFloat(min_fee)); }
+    if (max_fee)       { where += ' AND p.tuition_fee <= ?';                  params.push(parseFloat(max_fee)); }
 
     const orderMap = {
       ranking:      'u.world_ranking ASC, p.name ASC',
@@ -88,5 +95,3 @@ async function handler(req, res) {
     return res.status(500).json({ error: err.message, programs: [], total: 0, pages: 0 });
   }
 }
-
-export default withAuth(handler);

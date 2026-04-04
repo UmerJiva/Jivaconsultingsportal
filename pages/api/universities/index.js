@@ -4,6 +4,13 @@ import { withAuth } from '../../../lib/auth';
 import { paginate, searchLike } from '../../../lib/apiHelper';
 
 async function handler(req, res) {
+  // ── CORS (allows Jiva website to fetch) ──────────────────
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  // ─────────────────────────────────────────────────────────
+
   if (req.method === 'GET') {
     const { search = '', status = '' } = req.query;
     const { limit, offset } = paginate(req);
@@ -78,12 +85,10 @@ async function handler(req, res) {
       );
       const uniId = result.insertId;
 
-      // Intakes
       for (const intake of intakes) {
         await conn.execute('INSERT IGNORE INTO university_intakes (university_id, intake_name) VALUES (?,?)', [uniId, intake]);
       }
 
-      // Scholarships
       for (const s of scholarships) {
         if (!s.name) continue;
         await conn.execute(
@@ -93,7 +98,6 @@ async function handler(req, res) {
         );
       }
 
-      // Programs
       for (const p of programs) {
         if (!p.name) continue;
         await conn.execute(
