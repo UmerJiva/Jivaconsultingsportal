@@ -1,82 +1,79 @@
-// pages/hotels/[slug].js — Full hotel detail page (Booking.com style)
+// pages/hotels/[slug].js — Student Dormitory Detail Page
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import {
-  MapPin, Star, Heart, Share2, CheckCircle, ChevronDown,
-  ChevronUp, Info, Wifi, ParkingCircle, Coffee, Shield,
-  Users, Calendar, Plus, Minus, ChevronLeft, ChevronRight,
-  X, ArrowRight
+  MapPin, Heart, Share2, CheckCircle, ChevronLeft, ChevronRight,
+  X, Home, Wifi, Users, Phone, Mail, Globe, Star,
+  BedDouble, Maximize2, ArrowLeft, ZoomIn, ChevronDown,
+  Building2, Shield, Clock, DollarSign, Info, ExternalLink
 } from 'lucide-react';
 
-// ── Score Badge ───────────────────────────────────────────────
-function ScoreBadge({ score, label, count, large }) {
-  const color = score >= 9 ? 'bg-emerald-700' : score >= 8 ? 'bg-blue-800' : 'bg-blue-600';
+// ── Full-screen image viewer ──────────────────────────────────
+function ImageViewer({ images, startIndex, onClose }) {
+  const [current, setCurrent] = useState(startIndex);
+
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === 'Escape')      onClose();
+      if (e.key === 'ArrowRight')  setCurrent(c => (c + 1) % images.length);
+      if (e.key === 'ArrowLeft')   setCurrent(c => (c - 1 + images.length) % images.length);
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [images.length]);
+
   return (
-    <div className="flex items-center gap-2">
-      <div>
-        {label && <div className={`font-bold ${large ? 'text-base' : 'text-sm'} text-slate-800`}>{label}</div>}
-        <div className="text-xs text-slate-500">{count} reviews</div>
+    <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center">
+      {/* Close */}
+      <button onClick={onClose}
+        className="absolute top-5 right-5 w-10 h-10 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-colors z-10">
+        <X className="w-5 h-5" />
+      </button>
+
+      {/* Counter */}
+      <div className="absolute top-5 left-5 text-white/60 text-sm font-medium">
+        {current + 1} / {images.length}
       </div>
-      <div className={`${color} text-white font-bold ${large ? 'text-xl px-3 py-2' : 'text-base px-2.5 py-1.5'} rounded-lg`}>
-        {Number(score || 0).toFixed(1)}
-      </div>
-    </div>
-  );
-}
 
-// ── Breadcrumb ────────────────────────────────────────────────
-function Breadcrumb({ hotel }) {
-  return (
-    <div className="text-sm text-blue-600 flex items-center gap-1 flex-wrap">
-      <span className="hover:underline cursor-pointer">Home</span>
-      <ChevronRight className="w-3 h-3 text-slate-400" />
-      <span className="hover:underline cursor-pointer">{hotel?.country}</span>
-      <ChevronRight className="w-3 h-3 text-slate-400" />
-      <span className="hover:underline cursor-pointer">{hotel?.city}</span>
-      <ChevronRight className="w-3 h-3 text-slate-400" />
-      <span className="text-slate-600">Search results</span>
-    </div>
-  );
-}
+      {/* Prev */}
+      {images.length > 1 && (
+        <button onClick={() => setCurrent(c => (c - 1 + images.length) % images.length)}
+          className="absolute left-4 w-12 h-12 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-colors">
+          <ChevronLeft className="w-6 h-6" />
+        </button>
+      )}
 
-// ── Photo Gallery ─────────────────────────────────────────────
-function PhotoGallery({ images }) {
-  const [showAll, setShowAll] = useState(false);
-  if (!images?.length) return null;
-  const primary = images[0];
-  const secondary = images.slice(1, 3);
-  const thumbnails = images.slice(3, 8);
-  const extraCount = images.length - 8;
+      {/* Image */}
+      <img
+        src={images[current]?.image_url}
+        alt={images[current]?.caption || ''}
+        className="max-w-[90vw] max-h-[85vh] object-contain rounded-xl"
+      />
 
-  return (
-    <div className="mb-6">
-      <div className="flex gap-2 h-72">
-        {/* Main large image */}
-        <div className="flex-1 relative overflow-hidden rounded-l-2xl">
-          <img src={primary.image_url} alt={primary.caption || 'Hotel'} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer" />
+      {/* Next */}
+      {images.length > 1 && (
+        <button onClick={() => setCurrent(c => (c + 1) % images.length)}
+          className="absolute right-4 w-12 h-12 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-colors">
+          <ChevronRight className="w-6 h-6" />
+        </button>
+      )}
+
+      {/* Caption */}
+      {images[current]?.caption && (
+        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 text-white/70 text-sm bg-black/40 px-4 py-2 rounded-full">
+          {images[current].caption}
         </div>
-        {/* Right 2 images */}
-        <div className="flex flex-col gap-2 w-64">
-          {secondary.map((img, i) => (
-            <div key={i} className={`flex-1 overflow-hidden ${i === 1 ? 'rounded-tr-2xl' : ''}`}>
-              <img src={img.image_url} alt={img.caption || ''} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer" />
-            </div>
-          ))}
-        </div>
-      </div>
-      {/* Thumbnails row */}
-      {thumbnails.length > 0 && (
-        <div className="flex gap-2 mt-2">
-          {thumbnails.map((img, i) => (
-            <div key={i} className="relative flex-1 h-20 overflow-hidden rounded-xl cursor-pointer group">
-              <img src={img.image_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-              {i === thumbnails.length - 1 && extraCount > 0 && (
-                <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white font-bold text-sm">
-                  +{extraCount} photos
-                </div>
-              )}
-            </div>
+      )}
+
+      {/* Thumbnails */}
+      {images.length > 1 && (
+        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex gap-2 mt-2">
+          {images.map((img, i) => (
+            <button key={i} onClick={() => setCurrent(i)}
+              className={`w-12 h-12 rounded-lg overflow-hidden border-2 transition-all ${i === current ? 'border-white' : 'border-transparent opacity-50 hover:opacity-80'}`}>
+              <img src={img.image_url} className="w-full h-full object-cover" alt="" />
+            </button>
           ))}
         </div>
       )}
@@ -84,218 +81,283 @@ function PhotoGallery({ images }) {
   );
 }
 
-// ── Amenity Icon ──────────────────────────────────────────────
-const AMENITY_ICONS = {
-  wifi: '📶', parking: '🅿️', pool: '🏊', gym: '💪', spa: '💆',
-  restaurant: '🍽️', bar: '🍸', 'air conditioning': '❄️',
-  'free wifi': '📶', 'free parking': '🅿️', kitchen: '🍳',
-  shower: '🚿', tv: '📺', 'private bathroom': '🛁',
-  'pet friendly': '🐾', 'flat-screen tv': '📺',
-  apartments: '🏠', view: '👁️', coffee: '☕',
+// ── Photo Gallery ─────────────────────────────────────────────
+function PhotoGallery({ images, onOpen }) {
+  if (!images?.length) return (
+    <div className="h-72 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400">
+      <div className="text-center">
+        <Building2 className="w-12 h-12 mx-auto mb-2 opacity-30" />
+        <p className="text-sm">No photos available</p>
+      </div>
+    </div>
+  );
+
+  const main = images[0];
+  const side = images.slice(1, 5);
+
+  return (
+    <div className="relative mb-6">
+      <div className={`grid gap-2 h-80 ${side.length === 0 ? '' : side.length === 1 ? 'grid-cols-2' : side.length <= 3 ? 'grid-cols-3' : 'grid-cols-4'}`}>
+
+        {/* Main image */}
+        <div className={`relative overflow-hidden rounded-2xl cursor-pointer group ${side.length === 0 ? 'col-span-1' : side.length >= 4 ? 'col-span-2 row-span-2' : 'col-span-2'}`}
+          onClick={() => onOpen(0)}>
+          <img src={main.image_url} alt={main.caption || 'Dormitory'}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+            <ZoomIn className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+          {main.is_primary && (
+            <div className="absolute top-3 left-3 bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">Main Photo</div>
+          )}
+        </div>
+
+        {/* Side images */}
+        {side.map((img, i) => (
+          <div key={i} className="relative overflow-hidden rounded-2xl cursor-pointer group"
+            onClick={() => onOpen(i + 1)}>
+            <img src={img.image_url} alt={img.caption || ''}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+              <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+            {/* Show count on last */}
+            {i === side.length - 1 && images.length > 5 && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold text-lg">
+                +{images.length - 5}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* See all photos button */}
+      {images.length > 1 && (
+        <button onClick={() => onOpen(0)}
+          className="absolute bottom-4 right-4 flex items-center gap-2 bg-white text-slate-800 font-bold text-sm px-4 py-2 rounded-xl shadow-lg hover:bg-slate-50 transition-colors border border-slate-200">
+          <Maximize2 className="w-4 h-4" />
+          See all {images.length} photos
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Amenity badge ─────────────────────────────────────────────
+const AMENITY_ICONS_MAP = {
+  'free wifi': Wifi, 'wifi': Wifi,
+  'study room': Home, 'common kitchen': Home,
+  'laundry': Home, 'air conditioning': Home, 'heating': Home,
+  'elevator': Home, 'security / cctv': Shield, 'security': Shield,
+  '24-hour reception': Clock, 'parking': Home,
+  'gym / fitness': Users, 'common room / lounge': Home,
+  'bills included': DollarSign,
 };
 
-function AmenityBadge({ name }) {
-  const icon = AMENITY_ICONS[name.toLowerCase()] || '✓';
+function AmenityTag({ name }) {
+  const IconComp = AMENITY_ICONS_MAP[name.toLowerCase()] || CheckCircle;
   return (
-    <div className="flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700">
-      <span>{icon}</span> {name}
+    <div className="flex items-center gap-2.5 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-700 font-medium hover:border-emerald-300 hover:bg-emerald-50 transition-colors">
+      <IconComp className="w-4 h-4 text-emerald-600 shrink-0" />
+      {name}
     </div>
   );
 }
 
 // ── Room Card ─────────────────────────────────────────────────
-function RoomCard({ room, nights, adults, onReserve }) {
-  const totalPrice = room.price_per_night * nights;
-  const originalTotal = room.original_price ? room.original_price * nights : null;
+function RoomCard({ room, onOpenImage }) {
+  const [open, setOpen] = useState(false);
 
   return (
-    <div className="border border-slate-200 rounded-2xl overflow-hidden mb-4">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-blue-700 text-white text-xs font-bold">
-            <th className="text-left px-4 py-3">Room type</th>
-            <th className="px-4 py-3">Number of guests</th>
-            <th className="px-4 py-3">Price for {nights} night{nights > 1 ? 's' : ''}</th>
-            <th className="px-4 py-3">Your choices</th>
-            <th className="px-4 py-3">Select amount</th>
-            <th className="px-4 py-3"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr className="border-t border-slate-100 align-top">
-            {/* Room type */}
-            <td className="px-4 py-4 min-w-[200px]">
-              <div className="font-bold text-blue-700 hover:underline cursor-pointer mb-1">{room.name}</div>
+    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden hover:border-emerald-200 hover:shadow-md transition-all">
+      <div className="flex">
+        {/* Room photo */}
+        <div className="w-48 h-44 shrink-0 relative overflow-hidden group cursor-pointer bg-slate-100"
+          onClick={() => room.image_url && onOpenImage(room.image_url)}>
+          {room.image_url ? (
+            <>
+              <img src={room.image_url} alt={room.name}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            </>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-slate-300">
+              <BedDouble className="w-10 h-10" />
+            </div>
+          )}
+        </div>
+
+        {/* Room info */}
+        <div className="flex-1 p-5 flex flex-col justify-between min-w-0">
+          <div>
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <div>
+                <h3 className="font-bold text-slate-900 text-base leading-tight">{room.name}</h3>
+                <div className="flex items-center gap-3 mt-1 flex-wrap">
+                  {room.bed_type && (
+                    <span className="text-xs text-slate-500 flex items-center gap-1">
+                      <BedDouble className="w-3.5 h-3.5 text-slate-400" /> {room.bed_type}
+                    </span>
+                  )}
+                  {room.size_sqm && (
+                    <span className="text-xs text-slate-500 flex items-center gap-1">
+                      <Maximize2 className="w-3.5 h-3.5 text-slate-400" /> {room.size_sqm} m²
+                    </span>
+                  )}
+                  <span className="text-xs text-slate-500 flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5 text-slate-400" /> Max {room.max_guests}
+                  </span>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                {room.actual_price && (
+                  <div className="text-xs text-slate-400 line-through">
+                    PKR {Number(room.actual_price).toLocaleString()}
+                  </div>
+                )}
+                <div className="text-xl font-bold text-emerald-700">
+                  PKR {Number(room.price_per_night || 0).toLocaleString()}
+                </div>
+                <div className="text-[10px] text-slate-400">per month</div>
+              </div>
+            </div>
+
+            {/* Badges */}
+            <div className="flex flex-wrap gap-1.5 mb-3">
               {room.is_recommended && (
-                <div className="inline-block bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded mb-2">
-                  Recommended for {adults} adult{adults > 1 ? 's' : ''}
-                </div>
+                <span className="text-[10px] bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold px-2 py-0.5 rounded-full">
+                  ⭐ Recommended
+                </span>
               )}
-              {room.bed_type && <div className="text-xs text-slate-500 mb-2">🛏️ {room.bed_type}</div>}
-              <div className="flex flex-wrap gap-1 mb-2">
-                {room.size_sqm && <span className="text-[10px] border border-slate-200 px-1.5 py-0.5 rounded">{room.size_sqm} m²</span>}
-                {room.view_type && room.view_type.split(',').map(v => (
-                  <span key={v} className="text-[10px] border border-slate-200 px-1.5 py-0.5 rounded">{v.trim()}</span>
-                ))}
-                {room.amenities?.slice(0, 3).map(a => (
-                  <span key={a} className="text-[10px] border border-slate-200 px-1.5 py-0.5 rounded">{a}</span>
-                ))}
-              </div>
-              {/* Room amenities list */}
-              {room.amenities && room.amenities.length > 0 && (
-                <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-xs text-slate-600">
-                  {room.amenities.map(a => (
-                    <div key={a} className="flex items-center gap-1">
-                      <CheckCircle className="w-3 h-3 text-slate-400 shrink-0" /> {a}
-                    </div>
-                  ))}
-                </div>
+              {room.status === 'unavailable' && (
+                <span className="text-[10px] bg-red-100 text-red-600 border border-red-200 font-bold px-2 py-0.5 rounded-full">
+                  Unavailable
+                </span>
               )}
-            </td>
+            </div>
 
-            {/* Guests */}
-            <td className="px-4 py-4 text-center">
-              <div className="flex justify-center gap-1">
-                {Array.from({length: Math.min(room.max_guests || 2, 4)}).map((_,i) => (
-                  <span key={i} className="text-lg">👤</span>
+            {/* Amenities preview */}
+            {room.amenities?.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {room.amenities.slice(0, 4).map(a => (
+                  <span key={a} className="text-[11px] bg-slate-50 border border-slate-200 text-slate-600 px-2 py-0.5 rounded-lg font-medium">
+                    {a}
+                  </span>
                 ))}
+                {room.amenities.length > 4 && (
+                  <button onClick={() => setOpen(o => !o)}
+                    className="text-[11px] text-emerald-600 font-bold hover:underline">
+                    +{room.amenities.length - 4} more
+                  </button>
+                )}
               </div>
-            </td>
+            )}
+          </div>
 
-            {/* Price */}
-            <td className="px-4 py-4 text-center whitespace-nowrap">
-              {originalTotal && (
-                <div className="text-slate-400 line-through text-xs mb-0.5">
-                  PKR {Math.round(originalTotal).toLocaleString()}
-                </div>
-              )}
-              <div className="text-xl font-bold text-slate-900">
-                PKR {Math.round(totalPrice).toLocaleString()}
-              </div>
-              <div className="text-xs text-slate-400">Includes taxes and fees</div>
-              {room.discount_percent > 0 && (
-                <div className="inline-block bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded mt-1">
-                  {room.discount_percent}% off
-                </div>
-              )}
-              {room.has_deal && (
-                <div className="inline-block bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded mt-1 block">
-                  Getaway Deal
-                </div>
-              )}
-            </td>
-
-            {/* Choices */}
-            <td className="px-4 py-4 min-w-[180px]">
-              {room.inclusions?.map(inc => (
-                <div key={inc} className="flex items-start gap-1.5 text-xs text-emerald-700 font-semibold mb-1">
-                  <CheckCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{inc}
+          {/* Inclusions */}
+          {room.inclusions?.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-1">
+              {room.inclusions.map(inc => (
+                <div key={inc} className="flex items-center gap-1.5 text-xs text-emerald-700 font-semibold">
+                  <CheckCircle className="w-3.5 h-3.5 shrink-0" />{inc}
                 </div>
               ))}
-              {room.free_cancellation && (
-                <div className="flex items-start gap-1.5 text-xs text-emerald-700 font-semibold mb-1">
-                  <CheckCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  <span>Free cancellation{room.cancellation_deadline ? ` before ${new Date(room.cancellation_deadline).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}` : ''}</span>
-                </div>
-              )}
-              {room.no_prepayment && (
-                <div className="flex items-start gap-1.5 text-xs text-emerald-700 font-semibold">
-                  <CheckCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  No prepayment needed – pay at the property
-                </div>
-              )}
-            </td>
+            </div>
+          )}
+        </div>
+      </div>
 
-            {/* Select amount */}
-            <td className="px-4 py-4 text-center">
-              <select className="border border-slate-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-blue-400">
-                {[0,1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}
-              </select>
-            </td>
-
-            {/* Reserve */}
-            <td className="px-4 py-4 text-center">
-              <button
-                onClick={() => onReserve(room)}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-colors whitespace-nowrap shadow-sm">
-                I'll reserve
-              </button>
-              <div className="text-[10px] text-slate-400 mt-1">• You won't be charged yet</div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      {/* Expanded amenities */}
+      {open && room.amenities?.length > 4 && (
+        <div className="px-5 pb-4 pt-0 border-t border-slate-100">
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {room.amenities.map(a => (
+              <span key={a} className="text-xs bg-slate-50 border border-slate-200 text-slate-600 px-2.5 py-1 rounded-lg font-medium">
+                {a}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ── Main Page ─────────────────────────────────────────────────
-export default function HotelDetailPage() {
+export default function DormitoryDetailPage() {
   const router = useRouter();
-  const { slug, checkIn, checkOut, adults, children, rooms } = router.query;
+  const { slug } = router.query;
 
-  const [hotel, setHotel] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [showSignIn, setShowSignIn] = useState(true);
-  const overviewRef = useRef(null);
-  const availRef = useRef(null);
-
-  const nights = checkIn && checkOut
-    ? Math.max(1, Math.ceil((new Date(checkOut) - new Date(checkIn)) / (1000*60*60*24)))
-    : 28;
-  const gAdults = parseInt(adults) || 2;
-  const gRooms  = parseInt(rooms) || 1;
+  const [dorm,         setDorm]         = useState(null);
+  const [loading,      setLoading]      = useState(true);
+  const [viewerOpen,   setViewerOpen]   = useState(false);
+  const [viewerStart,  setViewerStart]  = useState(0);
+  const [roomImgOpen,  setRoomImgOpen]  = useState(false);
+  const [roomImgUrl,   setRoomImgUrl]   = useState('');
+  const [activeTab,    setActiveTab]    = useState('overview');
+  const [liked,        setLiked]        = useState(false);
 
   useEffect(() => {
     if (!slug) return;
-    fetch(`/api/hotels/${slug}?checkIn=${checkIn||''}&checkOut=${checkOut||''}&adults=${adults||2}`)
+    fetch(`/api/hotels/${slug}`)
       .then(r => r.json())
-      .then(d => { setHotel(d); setLoading(false); })
+      .then(d => { setDorm(d); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [slug, checkIn, checkOut, adults]);
+  }, [slug]);
 
-  function handleReserve(room) {
-    const params = new URLSearchParams({
-      hotelId: hotel.id, roomId: room.id,
-      checkIn: checkIn || '', checkOut: checkOut || '',
-      adults: adults || 2, children: children || 0, rooms: rooms || 1,
-    });
-    router.push(`/hotels/reserve?${params}`);
+  function openGallery(idx) {
+    setViewerStart(idx);
+    setViewerOpen(true);
+  }
+
+  function openRoomImage(url) {
+    setRoomImgUrl(url);
+    setRoomImgOpen(true);
   }
 
   if (loading) return (
-    <div className="min-h-screen bg-white flex items-center justify-center">
-      <div className="w-8 h-8 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin" />
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="w-10 h-10 border-4 border-emerald-600/20 border-t-emerald-600 rounded-full animate-spin" />
     </div>
   );
 
-  if (!hotel) return (
-    <div className="min-h-screen bg-white flex items-center justify-center text-slate-400">Hotel not found</div>
+  if (!dorm || dorm.error) return (
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center text-slate-400 gap-4">
+      <Home className="w-16 h-16 opacity-20" />
+      <p className="text-lg font-semibold text-slate-500">Dormitory not found</p>
+      <button onClick={() => router.push('/hotels')}
+        className="flex items-center gap-2 bg-emerald-600 text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-emerald-700 transition-colors">
+        <ArrowLeft className="w-4 h-4" /> Browse Dormitories
+      </button>
+    </div>
   );
 
   const TABS = [
-    { key: 'overview', label: 'Overview' },
-    { key: 'availability', label: 'Availability' },
-    { key: 'facilities', label: 'Facilities' },
-    { key: 'rules', label: 'House rules' },
-    { key: 'legal', label: 'Important and legal info' },
-    { key: 'reviews', label: `Guest reviews (${hotel.review_count || 0})` },
+    { key: 'overview',     label: 'Overview'     },
+    { key: 'rooms',        label: `Rooms (${dorm.rooms?.length || 0})` },
+    { key: 'facilities',   label: 'Facilities'   },
+    { key: 'contact',      label: 'Contact'      },
   ];
 
   return (
     <>
-      <Head><title>{hotel.name} – Hotel Booking</title></Head>
-      <div className="min-h-screen bg-white">
+      <Head><title>{dorm.name} | Student Accommodation</title></Head>
 
-        {/* ── TABS BAR ── */}
-        <div className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4">
+      <div className="min-h-screen bg-slate-50">
+
+        {/* ── TOP NAV ── */}
+        <div className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-40">
+          <div className="max-w-6xl mx-auto px-4">
             <div className="flex items-center gap-0 overflow-x-auto">
               {TABS.map(tab => (
                 <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                  className={`px-5 py-4 text-sm font-medium whitespace-nowrap border-b-2 transition-colors
-                    ${activeTab === tab.key ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-600 hover:text-slate-900'}`}>
+                  className={`px-5 py-4 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${
+                    activeTab === tab.key
+                      ? 'border-emerald-600 text-emerald-700'
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                  }`}>
                   {tab.label}
                 </button>
               ))}
@@ -303,224 +365,147 @@ export default function HotelDetailPage() {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 py-5">
-          <Breadcrumb hotel={hotel} />
+        <div className="max-w-6xl mx-auto px-4 py-6">
 
-          {/* ── HOTEL HEADER ── */}
-          <div className="flex items-start justify-between gap-4 mt-4 mb-4">
+          {/* ── Breadcrumb ── */}
+          <div className="flex items-center gap-1.5 text-sm text-emerald-600 mb-4">
+            <button onClick={() => router.push('/hotels')} className="hover:underline flex items-center gap-1">
+              <ArrowLeft className="w-3.5 h-3.5" /> All Dormitories
+            </button>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+            {dorm.country && <><span className="text-slate-400">{dorm.country}</span><ChevronRight className="w-3.5 h-3.5 text-slate-400" /></>}
+            {dorm.city && <><span className="text-slate-400">{dorm.city}</span><ChevronRight className="w-3.5 h-3.5 text-slate-400" /></>}
+            <span className="text-slate-600 font-medium truncate max-w-[200px]">{dorm.name}</span>
+          </div>
+
+          {/* ── HEADER ── */}
+          <div className="flex items-start justify-between gap-4 mb-5">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                {/* Stars */}
-                <div className="flex">
-                  {Array.from({length: hotel.star_rating || 3}).map((_,i) => (
-                    <span key={i} className="text-yellow-400 text-sm">⭐</span>
-                  ))}
+                <span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full border border-emerald-200">
+                  Student Accommodation
+                </span>
+                {dorm.is_featured && (
+                  <span className="text-xs font-bold bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full border border-amber-200">
+                    ⭐ Featured
+                  </span>
+                )}
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
+                  dorm.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'
+                }`}>
+                  {dorm.status === 'active' ? 'Available' : 'Unavailable'}
+                </span>
+              </div>
+              <h1 className="text-3xl font-extrabold text-slate-900 leading-tight mb-2" style={{ fontFamily: 'Georgia,serif', letterSpacing: '-0.02em' }}>
+                {dorm.name}
+              </h1>
+              {dorm.address && (
+                <div className="flex items-center gap-1.5 text-sm text-slate-500">
+                  <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{[dorm.address, dorm.city, dorm.country].filter(Boolean).join(', ')}</span>
                 </div>
-              </div>
-              <h1 className="text-2xl font-bold text-slate-900 mb-1">{hotel.name}</h1>
-              <div className="flex items-center gap-2 text-sm text-blue-600">
-                <MapPin className="w-3.5 h-3.5" />
-                <span>{hotel.address}, {hotel.city}, {hotel.country}</span>
-                <span className="text-slate-300">–</span>
-                <button className="font-bold hover:underline">Great location - show map</button>
-                <span className="text-slate-300">–</span>
-                <span className="text-slate-500">Subway/metro & Train Access</span>
-              </div>
+              )}
             </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <button className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50">
-                <Heart className="w-5 h-5 text-slate-500" />
+            <div className="flex items-center gap-2 shrink-0">
+              <button onClick={() => setLiked(l => !l)}
+                className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors">
+                <Heart className={`w-5 h-5 ${liked ? 'text-red-500 fill-red-500' : 'text-slate-400'}`} />
               </button>
-              <button className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50">
-                <Share2 className="w-5 h-5 text-slate-500" />
+              <button className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors">
+                <Share2 className="w-5 h-5 text-slate-400" />
               </button>
-              <button
-                onClick={() => setActiveTab('availability')}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-colors">
-                Reserve
-              </button>
+              <a href={`#rooms`}
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-colors shadow-sm shadow-emerald-200">
+                View Rooms
+              </a>
             </div>
           </div>
 
-          {/* ── PHOTO GALLERY ── */}
-          <PhotoGallery images={hotel.images || []} />
+          {/* ── GALLERY ── */}
+          <PhotoGallery images={dorm.images || []} onOpen={openGallery} />
 
+          {/* ── LAYOUT ── */}
           <div className="flex gap-6">
-            {/* ── MAIN CONTENT ── */}
-            <div className="flex-1 min-w-0">
 
-              {/* Score + Wifi row */}
-              <div className="flex items-center gap-4 mb-5 p-4 bg-slate-50 rounded-2xl">
-                <ScoreBadge score={hotel.review_score} label={hotel.review_label} count={hotel.review_count} large />
-                <div className="h-8 w-px bg-slate-200" />
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                  Free Wifi
-                  <div className="bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded">10</div>
-                </div>
-              </div>
+            {/* ── MAIN ── */}
+            <div className="flex-1 min-w-0 space-y-6">
 
-              {/* Amenity badges */}
-              {hotel.amenities && hotel.amenities.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-6">
-                  {hotel.amenities.map(a => (
-                    <AmenityBadge key={a.name} name={a.name} />
-                  ))}
-                </div>
-              )}
-
-              {/* Sign-in banner */}
-              {showSignIn && (
-                <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-5">
-                  <div>
-                    <div className="font-bold text-slate-800 text-sm mb-0.5">Sign in, save money</div>
-                    <div className="text-xs text-slate-500">Sign in to see if you can save 10% or more at this property.</div>
-                    <div className="flex gap-3 mt-2">
-                      <button className="text-sm font-bold text-blue-600 border border-blue-300 px-4 py-1.5 rounded-lg hover:bg-blue-50">Sign in</button>
-                      <button className="text-sm text-blue-600 hover:underline">Create an account</button>
+              {/* Stats row */}
+              <div className="grid grid-cols-3 gap-4">
+                {[
+                  { icon: Home,     label: 'Rooms Available', value: dorm.rooms?.filter(r => r.status !== 'unavailable').length || '—' },
+                  { icon: Users,    label: 'Total Rooms',     value: dorm.rooms?.length || '—' },
+                  { icon: Building2,label: 'Location',        value: dorm.city || '—' },
+                ].map(s => (
+                  <div key={s.label} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center shrink-0">
+                      <s.icon className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-slate-800">{s.value}</div>
+                      <div className="text-xs text-slate-400 font-medium">{s.label}</div>
                     </div>
                   </div>
-                  <div className="text-5xl">🎁</div>
-                  <button onClick={() => setShowSignIn(false)} className="text-slate-400 hover:text-slate-600 self-start">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-
-              {/* Availability section */}
-              <div ref={availRef} className="mb-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-xl font-bold text-slate-900">Availability</h2>
-                  <span className="text-xs text-slate-400 flex items-center gap-1">
-                    <Info className="w-3 h-3" /> Prices converted to PKR
-                  </span>
-                </div>
-
-                {/* Date + guests search */}
-                <div className="flex gap-2 items-center mb-4 p-3 border border-[#f5a623] rounded-xl bg-[#fef9f0]">
-                  <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700">
-                    <Calendar className="w-4 h-4 text-slate-400" />
-                    {checkIn ? new Date(checkIn).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}) : 'Check-in'}
-                    <span className="text-slate-300 mx-1">—</span>
-                    {checkOut ? new Date(checkOut).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}) : 'Check-out'}
-                  </div>
-                  <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700">
-                    <Users className="w-4 h-4 text-slate-400" />
-                    {gAdults} adults · {parseInt(children)||0} children · {gRooms} rooms
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                  </div>
-                  <button
-                    onClick={() => router.reload()}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-lg text-sm transition-colors">
-                    Change search
-                  </button>
-                </div>
-
-                {/* Recommended section */}
-                {hotel.rooms && hotel.rooms.some(r => r.is_recommended) && (
-                  <div className="mb-4 p-4 border border-slate-200 rounded-2xl">
-                    <div className="font-bold text-slate-800 mb-3">Recommended for {gAdults} adults</div>
-                    {hotel.rooms.filter(r => r.is_recommended).map(room => {
-                      const totalPrice = room.price_per_night * nights;
-                      const origTotal = room.original_price ? room.original_price * nights : null;
-                      return (
-                        <div key={room.id} className="flex items-start justify-between gap-4">
-                          <div>
-                            <div className="text-sm font-bold text-blue-700 mb-0.5">1 × {room.name}</div>
-                            <div className="text-xs text-slate-500 mb-1">Price for: {Array.from({length:gAdults}).map((_,i)=>'👤').join('')}</div>
-                            <div className="text-xs text-slate-500 mb-2">🛏️ {room.bed_type}</div>
-                            {room.free_cancellation && (
-                              <div className="text-xs text-emerald-600 font-bold flex items-center gap-1">
-                                <CheckCircle className="w-3 h-3" />
-                                Free cancellation before {room.cancellation_deadline ? new Date(room.cancellation_deadline).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}) : 'check-in'}
-                                <span className="text-slate-400 font-normal cursor-pointer">❓</span>
-                              </div>
-                            )}
-                            {room.no_prepayment && (
-                              <div className="text-xs text-emerald-600 font-bold flex items-center gap-1 mt-0.5">
-                                <CheckCircle className="w-3 h-3" /> No prepayment needed – pay at the property
-                              </div>
-                            )}
-                          </div>
-                          <div className="text-right shrink-0">
-                            <div className="text-xs text-slate-500">{nights > 6 ? `${Math.round(nights/7)} weeks` : `${nights} nights`}, {gAdults} adults</div>
-                            {origTotal && <div className="text-sm text-slate-400 line-through">PKR {Math.round(origTotal).toLocaleString()}</div>}
-                            <div className="text-xl font-bold text-slate-900">PKR {Math.round(totalPrice).toLocaleString()}</div>
-                            <div className="text-xs text-slate-400 mb-2">Includes taxes and fees</div>
-                            {room.has_deal && <div className="inline-block bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded mb-2">Getaway Deal</div>}
-                            <button
-                              onClick={() => handleReserve(room)}
-                              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-xl text-sm transition-colors">
-                              Reserve
-                            </button>
-                            <div className="text-[10px] text-slate-400 mt-1">You won't be charged yet</div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* About */}
-                {hotel.description && (
-                  <div className="mb-6">
-                    <h3 className="text-lg font-bold text-slate-800 mb-3">About this property</h3>
-                    {hotel.description.split('\n\n').map((para, i) => (
-                      <p key={i} className="text-sm text-slate-600 leading-relaxed mb-3">{para}</p>
-                    ))}
-                  </div>
-                )}
-
-                {/* Most popular facilities */}
-                {hotel.amenities && hotel.amenities.length > 0 && (
-                  <div className="mb-6">
-                    <h3 className="text-lg font-bold text-slate-800 mb-3">Most popular facilities</h3>
-                    <div className="flex flex-wrap gap-x-6 gap-y-2">
-                      {hotel.amenities.slice(0, 10).map(a => (
-                        <div key={a.name} className="flex items-center gap-2 text-sm text-slate-700">
-                          <span>{AMENITY_ICONS[a.name.toLowerCase()] || '✓'}</span> {a.name}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* All available rooms */}
-                <h3 className="text-lg font-bold text-slate-800 mb-3">All available apartments</h3>
-                {hotel.rooms && hotel.rooms.map(room => (
-                  <RoomCard
-                    key={room.id}
-                    room={room}
-                    nights={nights}
-                    adults={gAdults}
-                    onReserve={handleReserve}
-                  />
                 ))}
               </div>
 
-              {/* Reviews */}
-              {hotel.reviews && hotel.reviews.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-bold text-slate-800 mb-3">Guest reviews</h3>
+              {/* About */}
+              {dorm.description && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                  <h2 className="text-lg font-bold text-slate-800 mb-4" style={{ fontFamily: 'Georgia,serif' }}>About This Dormitory</h2>
+                  <div className="space-y-3">
+                    {dorm.description.split('\n\n').map((para, i) => (
+                      <p key={i} className="text-sm text-slate-600 leading-relaxed">{para}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Facilities */}
+              {dorm.amenities?.length > 0 && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6" id="facilities">
+                  <h2 className="text-lg font-bold text-slate-800 mb-4" style={{ fontFamily: 'Georgia,serif' }}>Facilities & Amenities</h2>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    {dorm.amenities.map(a => (
+                      <AmenityTag key={a.name || a} name={a.name || a} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Rooms */}
+              <div id="rooms">
+                <h2 className="text-lg font-bold text-slate-800 mb-4" style={{ fontFamily: 'Georgia,serif' }}>
+                  Available Rooms & Dormitories
+                </h2>
+                {dorm.rooms?.length === 0 || !dorm.rooms ? (
+                  <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-10 text-center text-slate-400">
+                    <BedDouble className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                    <p className="font-semibold text-slate-500">No rooms listed yet</p>
+                  </div>
+                ) : (
                   <div className="space-y-4">
-                    {hotel.reviews.map(review => (
-                      <div key={review.id} className="border border-slate-200 rounded-2xl p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <div className="font-bold text-slate-800">{review.reviewer_name}</div>
-                            <div className="text-xs text-slate-400">{review.reviewer_country} · {new Date(review.created_at).toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</div>
-                          </div>
-                          <div className="bg-blue-600 text-white font-bold text-sm px-2 py-1 rounded-lg">{Number(review.score).toFixed(1)}</div>
+                    {dorm.rooms.map(room => (
+                      <RoomCard key={room.id} room={room} onOpenImage={openRoomImage} />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Highlights */}
+              {dorm.highlights?.length > 0 && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                  <h2 className="text-lg font-bold text-slate-800 mb-4" style={{ fontFamily: 'Georgia,serif' }}>Property Highlights</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {dorm.highlights.map(h => (
+                      <div key={h.id || h.title} className="flex items-start gap-3 p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+                        <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center shrink-0">
+                          <CheckCircle className="w-4 h-4 text-emerald-600" />
                         </div>
-                        {review.positive_review && (
-                          <div className="text-sm text-slate-700 mb-1">
-                            <span className="text-emerald-600 font-bold">+ </span>{review.positive_review}
-                          </div>
-                        )}
-                        {review.negative_review && (
-                          <div className="text-sm text-slate-600">
-                            <span className="text-red-500 font-bold">- </span>{review.negative_review}
-                          </div>
-                        )}
+                        <div>
+                          <div className="font-bold text-sm text-slate-800">{h.title}</div>
+                          {h.description && <div className="text-xs text-slate-500 mt-0.5">{h.description}</div>}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -529,78 +514,126 @@ export default function HotelDetailPage() {
             </div>
 
             {/* ── SIDEBAR ── */}
-            <div className="w-80 shrink-0">
+            <div className="w-72 shrink-0">
               <div className="sticky top-20 space-y-4">
 
-                {/* Score card */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-                  <ScoreBadge score={hotel.review_score} label={hotel.review_label} count={hotel.review_count} large />
-                  <div className="flex items-center justify-between mt-3 text-sm">
-                    <span className="font-semibold text-slate-700">Free Wifi</span>
-                    <div className="bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded">10</div>
-                  </div>
-                </div>
+                {/* Price range card */}
+                {dorm.rooms?.length > 0 && (() => {
+                  const prices = dorm.rooms.filter(r => r.price_per_night).map(r => Number(r.price_per_night));
+                  const min = Math.min(...prices);
+                  const max = Math.max(...prices);
+                  return prices.length > 0 ? (
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+                      <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Monthly Rent</div>
+                      <div className="text-2xl font-extrabold text-emerald-700">
+                        {min === max
+                          ? `PKR ${min.toLocaleString()}`
+                          : `PKR ${min.toLocaleString()} – ${max.toLocaleString()}`}
+                      </div>
+                      <div className="text-xs text-slate-400 mb-4">per month</div>
+                      <a href="#rooms"
+                        className="flex items-center justify-center gap-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm transition-colors shadow-sm shadow-emerald-200">
+                        View All Rooms
+                      </a>
+                    </div>
+                  ) : null;
+                })()}
 
-                {/* Map */}
-                <div className="bg-slate-100 rounded-2xl overflow-hidden h-44 relative">
-                  <div className="absolute inset-0 flex items-center justify-center bg-slate-200">
+                {/* Location card */}
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Location</div>
+                  {/* Map placeholder */}
+                  <div className="h-32 bg-slate-100 rounded-xl flex items-center justify-center mb-3 border border-slate-200 overflow-hidden">
                     <div className="text-center">
-                      <MapPin className="w-8 h-8 text-blue-600 mx-auto mb-1" />
-                      <div className="text-sm font-bold text-slate-700">{hotel.city}, {hotel.country}</div>
+                      <MapPin className="w-6 h-6 text-emerald-600 mx-auto mb-1" />
+                      <div className="text-xs text-slate-500 font-medium">{dorm.city}{dorm.country ? `, ${dorm.country}` : ''}</div>
                     </div>
                   </div>
-                  <button className="absolute bottom-3 inset-x-3 bg-blue-600 text-white font-bold py-2 rounded-xl text-sm text-center hover:bg-blue-700 transition-colors">
-                    Show on map
-                  </button>
+                  {dorm.address && (
+                    <div className="flex items-start gap-2 text-xs text-slate-600">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                      {dorm.address}
+                    </div>
+                  )}
                 </div>
 
-                {/* Property highlights */}
-                {hotel.highlights && hotel.highlights.length > 0 && (
-                  <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
-                    <h3 className="font-bold text-slate-800 mb-3">Property highlights</h3>
-                    {nights > 20 && (
-                      <div className="font-bold text-slate-700 text-sm mb-2">
-                        Perfect for a {Math.round(nights/7)}-week stay!
-                      </div>
-                    )}
-                    {hotel.highlights.map(h => (
-                      <div key={h.id} className="flex items-start gap-2 text-sm text-slate-700 mb-1.5">
-                        <MapPin className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                        <div>
-                          <div className="font-semibold">{h.title}</div>
-                          {h.description && <div className="text-xs text-slate-500">{h.description}</div>}
-                        </div>
-                      </div>
-                    ))}
-                    <button
-                      onClick={() => handleReserve(hotel.rooms?.[0])}
-                      className="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-colors">
-                      Reserve
-                    </button>
+                {/* Contact card */}
+                {(dorm.phone || dorm.email || dorm.website) && (
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Contact</div>
+                    <div className="space-y-2.5">
+                      {dorm.phone && (
+                        <a href={`tel:${dorm.phone}`} className="flex items-center gap-2.5 text-sm text-slate-700 hover:text-emerald-600 transition-colors group">
+                          <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                            <Phone className="w-4 h-4 text-emerald-600" />
+                          </div>
+                          <span className="font-medium">{dorm.phone}</span>
+                        </a>
+                      )}
+                      {dorm.email && (
+                        <a href={`mailto:${dorm.email}`} className="flex items-center gap-2.5 text-sm text-slate-700 hover:text-emerald-600 transition-colors group">
+                          <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                            <Mail className="w-4 h-4 text-emerald-600" />
+                          </div>
+                          <span className="font-medium truncate">{dorm.email}</span>
+                        </a>
+                      )}
+                      {dorm.website && (
+                        <a href={dorm.website} target="_blank" rel="noreferrer" className="flex items-center gap-2.5 text-sm text-slate-700 hover:text-emerald-600 transition-colors group">
+                          <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                            <Globe className="w-4 h-4 text-emerald-600" />
+                          </div>
+                          <span className="font-medium flex items-center gap-1">Website <ExternalLink className="w-3 h-3 opacity-50" /></span>
+                        </a>
+                      )}
+                    </div>
                   </div>
                 )}
 
-                {/* Genius discount */}
-                <div className="border border-slate-200 rounded-2xl p-4 text-sm text-slate-600">
-                  You might be eligible for a Genius discount at {hotel.name}.{' '}
-                  <button className="text-blue-600 font-bold hover:underline">Sign in</button>{' '}
-                  to check if a Genius discount is available for your selected dates.
+                {/* Quick enquiry CTA */}
+                <div className="bg-emerald-600 rounded-2xl p-5 text-white">
+                  <div className="font-bold text-base mb-1">Interested?</div>
+                  <p className="text-sm text-emerald-100 mb-4">Contact us for availability and booking</p>
+                  {dorm.phone && (
+                    <a href={`tel:${dorm.phone}`}
+                      className="flex items-center justify-center gap-2 w-full bg-white text-emerald-700 font-bold py-2.5 rounded-xl text-sm hover:bg-emerald-50 transition-colors">
+                      <Phone className="w-4 h-4" /> Call Now
+                    </a>
+                  )}
+                  {dorm.email && (
+                    <a href={`mailto:${dorm.email}`}
+                      className="flex items-center justify-center gap-2 w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2.5 rounded-xl text-sm transition-colors mt-2">
+                      <Mail className="w-4 h-4" /> Send Enquiry
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* ── Full gallery viewer ── */}
+      {viewerOpen && (
+        <ImageViewer
+          images={dorm.images || []}
+          startIndex={viewerStart}
+          onClose={() => setViewerOpen(false)}
+        />
+      )}
+
+      {/* ── Single room image viewer ── */}
+      {roomImgOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setRoomImgOpen(false)}>
+          <button className="absolute top-5 right-5 w-10 h-10 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+          <img src={roomImgUrl} alt="Room"
+            className="max-w-[90vw] max-h-[85vh] object-contain rounded-2xl"
+            onClick={e => e.stopPropagation()} />
+        </div>
+      )}
     </>
   );
 }
-
-// const AMENITY_ICONS = {
-//   wifi: '📶', 'free wifi': '📶', parking: '🅿️', 'free parking': '🅿️',
-//   pool: '🏊', spa: '💆', restaurant: '🍽️', bar: '🍸',
-//   'air conditioning': '❄️', kitchen: '🍳', shower: '🚿', tv: '📺',
-//   'flat-screen tv': '📺', 'private bathroom': '🛁', 'pet friendly': '🐾',
-//   apartments: '🏠', view: '👁️', '24-hour front desk': '🕐',
-//   terrace: '🌿', heating: '🔥', laundry: '👕', 'daily housekeeping': '✨',
-//   'designated smoking area': '🚬', 'swimming pool': '🏊',
-// };

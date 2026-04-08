@@ -1,17 +1,17 @@
-// pages/api/admin/hotels/[id].js
+// pages/api/admin/hotels/[id].js — Dormitory API
 import { query, getPool } from '../../../../lib/db';
 import { saveHotelRelated } from '../../../../lib/hotelHelpers';
 
 export default async function handler(req, res) {
   const { id } = req.query;
-  if (!id) return res.status(400).json({ error: 'Missing hotel id' });
+  if (!id) return res.status(400).json({ error: 'Missing id' });
 
   // ── GET ───────────────────────────────────────────────────
   if (req.method === 'GET') {
     try {
       const rows = await query(`SELECT * FROM hotels WHERE id = ?`, [id]);
       const hotel = rows[0];
-      if (!hotel) return res.status(404).json({ error: 'Hotel not found' });
+      if (!hotel) return res.status(404).json({ error: 'Dormitory not found' });
 
       const images     = await query(`SELECT * FROM hotel_images WHERE hotel_id = ? ORDER BY sort_order`, [id]);
       const amenities  = await query(`SELECT * FROM hotel_amenities WHERE hotel_id = ?`, [id]);
@@ -38,16 +38,13 @@ export default async function handler(req, res) {
   // ── PUT ───────────────────────────────────────────────────
   if (req.method === 'PUT') {
     const {
-      name, slug, star_rating, description, address, city, country,
-      latitude, longitude, phone, email, website,
-      check_in_time, check_out_time, status, is_featured,
-      review_score, review_count, review_label, currency,
-      free_cancellation, no_prepayment,
+      name, slug, description, address, city, country,
+      phone, email, website, status, is_featured, currency,
       images, amenities, rooms, highlights,
     } = req.body || {};
 
     if (!name || !city || !country) {
-      return res.status(400).json({ error: 'Hotel name, city and country are required.' });
+      return res.status(400).json({ error: 'Dormitory name, city and country are required.' });
     }
 
     const pool = getPool();
@@ -59,20 +56,15 @@ export default async function handler(req, res) {
 
       await conn.execute(
         `UPDATE hotels SET
-          name=?, slug=?, star_rating=?, description=?, address=?, city=?, country=?,
-          latitude=?, longitude=?, phone=?, email=?, website=?,
-          check_in_time=?, check_out_time=?, status=?, is_featured=?,
-          review_score=?, review_count=?, review_label=?, currency=?,
-          free_cancellation=?, no_prepayment=?
+          name=?, slug=?, description=?, address=?, city=?, country=?,
+          phone=?, email=?, website=?, status=?, is_featured=?, currency=?
          WHERE id=?`,
         [
           name, slug || autoSlug,
-          star_rating || 3, description || null, address || null, city, country,
-          latitude || null, longitude || null, phone || null, email || null, website || null,
-          check_in_time || '14:00', check_out_time || '11:00',
+          description || null, address || null, city, country,
+          phone || null, email || null, website || null,
           status || 'active', is_featured ? 1 : 0,
-          review_score || 0, review_count || 0, review_label || null,
-          currency || 'PKR', free_cancellation ? 1 : 0, no_prepayment ? 1 : 0,
+          currency || 'PKR',
           id,
         ]
       );
@@ -90,9 +82,9 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── PATCH ─────────────────────────────────────────────────
+  // ── PATCH — status toggle ─────────────────────────────────
   if (req.method === 'PATCH') {
-    const ALLOWED = ['status', 'is_featured', 'review_score', 'review_count', 'review_label'];
+    const ALLOWED = ['status', 'is_featured'];
     const updates = req.body || {};
     const safe    = Object.keys(updates).filter(k => ALLOWED.includes(k));
     if (!safe.length) return res.status(400).json({ error: 'No valid fields to update' });

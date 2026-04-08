@@ -1,4 +1,4 @@
-// pages/api/admin/hotels/index.js
+// pages/api/admin/hotels/index.js — Dormitory API
 import { query, getPool } from '../../../../lib/db';
 import { saveHotelRelated } from '../../../../lib/hotelHelpers';
 
@@ -27,16 +27,13 @@ export default async function handler(req, res) {
   // ── POST ──────────────────────────────────────────────────
   if (req.method === 'POST') {
     const {
-      name, slug, star_rating, description, address, city, country,
-      latitude, longitude, phone, email, website,
-      check_in_time, check_out_time, status, is_featured,
-      review_score, review_count, review_label, currency,
-      free_cancellation, no_prepayment,
+      name, slug, description, address, city, country,
+      phone, email, website, status, is_featured, currency,
       images, amenities, rooms, highlights,
     } = req.body || {};
 
     if (!name || !city || !country) {
-      return res.status(400).json({ error: 'Hotel name, city and country are required.' });
+      return res.status(400).json({ error: 'Dormitory name, city and country are required.' });
     }
 
     const pool = getPool();
@@ -47,19 +44,16 @@ export default async function handler(req, res) {
       const autoSlug = (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
       const [result] = await conn.execute(
-        `INSERT INTO hotels (name,slug,star_rating,description,address,city,country,
-          latitude,longitude,phone,email,website,check_in_time,check_out_time,
-          status,is_featured,review_score,review_count,review_label,currency,
-          free_cancellation,no_prepayment)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        `INSERT INTO hotels
+          (name, slug, description, address, city, country,
+           phone, email, website, status, is_featured, currency)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
           name, slug || autoSlug,
-          star_rating || 3, description || null, address || null, city, country,
-          latitude || null, longitude || null, phone || null, email || null, website || null,
-          check_in_time || '14:00', check_out_time || '11:00',
+          description || null, address || null, city, country,
+          phone || null, email || null, website || null,
           status || 'active', is_featured ? 1 : 0,
-          review_score || 0, review_count || 0, review_label || null,
-          currency || 'PKR', free_cancellation ? 1 : 0, no_prepayment ? 1 : 0,
+          currency || 'PKR',
         ]
       );
 
