@@ -56,6 +56,8 @@ const NAV = {
           activeOn: ['/agent/team'] },
         { label: 'My Tasks',         href: '/agent/tasks',             icon: CheckCircle,
           activeOn: ['/agent/tasks'] },
+          { label: 'Institutions', href: '/agent/institutions', icon: Building2,
+  activeOn: ['/agent/institutions', '/agent/institution'] },
         { label: 'Programs',         href: '/agent/universities',      icon: BookOpen,
           activeOn: ['/agent/universities', '/agent/university', '/agent/program'] },
         { label: 'Chat with Admin',  href: '/agent/chat',              icon: MessageSquare,
@@ -75,6 +77,8 @@ const NAV = {
       items: [
         { label: 'Dashboard',        href: '/student/dashboard',         icon: LayoutDashboard },
         { label: 'My Profile',       href: '/student/profile',           icon: Users           },
+        { label: 'Institutions', href: '/student/institutions', icon: Building2,
+  activeOn: ['/student/institutions', '/student/institution'] },
         { label: 'Programs',         href: '/student/universities',      icon: BookOpen,
           activeOn: ['/student/universities', '/student/university', '/student/program'] },
         { label: 'Applications',     href: '/student/applications',      icon: FileText        },
